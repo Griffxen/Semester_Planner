@@ -64,7 +64,7 @@ PLANNER_DB=./data/production.db python3 app.py
 - [结构与设计](docs/ARCHITECTURE.md)
 - [贡献与提交约定](CONTRIBUTING.md)
 - [安全边界与报告说明](SECURITY.md)
-- [许可证选择建议](docs/LICENSING.md)
+- [许可证说明](docs/LICENSING.md)
 
 ```sh
 python3 -m unittest discover -s tests -q
@@ -81,6 +81,12 @@ node --check static/share.js
 
 自带 HTTP 服务用于个人或小范围受控部署，不是经专业审计的公共 SaaS。公网使用需配置 HTTPS、代理限速、备份和访问策略。
 
-## 许可证状态
+## 许可证
 
-许可证尚未选定，仓库未附加授权文件。发布为开源项目之前，应由维护者确认许可证及版权署名；当前不应宣称已采用 MIT 或其他开源许可证。
+本项目采用 **GNU AGPL v3（AGPL-3.0-only）**，详见 [LICENSE](LICENSE)。
+
+Copyright (c) 2026 Ruixiao Guo (Griffxen), College of Engineering, Peking University, Undergraduate.
+
+允许使用、修改与商业使用，但须遵守 AGPL 的源码提供、版权声明保留等要求。
+修改版通过网络提供交互服务时，应按第 13 条向远程用户提供获取对应源码的方式。
+详见 [版权声明](NOTICE.md) 和 [许可证说明](docs/LICENSING.md)。
