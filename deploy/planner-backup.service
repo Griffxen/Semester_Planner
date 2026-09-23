@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up semester planner
+[Service]
+Type=oneshot
+User=planner
+Environment=PLANNER_DB=/var/lib/semester-planner/planner.db
+ExecStart=/usr/bin/python3 /opt/semester-planner/backup.py --output /var/lib/semester-planner/backups
+UMask=0077
