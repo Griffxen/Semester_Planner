@@ -1,0 +1,7 @@
+# Replace with the approved school hostname; requires suitable DNS/network access.
+planner.example.org {
+    request_body {
+        max_size 64KB
+    }
+    reverse_proxy 127.0.0.1:8765
+}
