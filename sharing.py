@@ -9,6 +9,8 @@ def init_sharing(c):
     c.execute('''CREATE TABLE IF NOT EXISTS viewers(
         user_id INTEGER PRIMARY KEY, owner_id INTEGER NOT NULL,
         active INTEGER NOT NULL DEFAULT 1, policy TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1)''')
+    if 'dashboard_token_hash' not in [r['name'] for r in c.execute('PRAGMA table_info(viewers)')]:
+        c.execute('ALTER TABLE viewers ADD COLUMN dashboard_token_hash TEXT')
 
 def validate_policy(raw, categories):
     if not isinstance(raw,dict): raise ValueError()

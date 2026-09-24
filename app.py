@@ -2,6 +2,7 @@ import re, argparse, datetime as dt, getpass, hashlib, hmac, http.cookies, json,
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from sharing import init_sharing, DEFAULT_POLICY, validate_policy, private_state, shared_state, drop_category_permissions
+from dashboard_api import agenda as dashboard_agenda, meta as dashboard_meta
 ROOT=Path(__file__).resolve().parent
 DB=Path(os.environ.get('PLANNER_DB', ROOT/'data/planner.db'))
 def connect():
@@ -75,6 +76,8 @@ class Handler(BaseHTTPRequestHandler):
         except Exception: self.send(500,{'error':'服务器处理失败，请重试'})
     def route(self,method):
         path=self.path.split('?')[0]
+        if path in ('/api/v1/agenda','/api/v1/agenda/meta') and method!='GET':
+            self.send(405,{'error':'只支持读取'}); return
         if method=='GET' and path in ('/','/app.js','/style.css','/icon.svg','/share.js'):
             f=ROOT/'static'/({'/':'index.html'}.get(path,path[1:])); self.send(200,f.read_bytes(),{'/':'text/html; charset=utf-8','/app.js':'text/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8','/icon.svg':'image/svg+xml','/share.js':'text/javascript; charset=utf-8'}[path]); return
         data={}
@@ -85,6 +88,15 @@ class Handler(BaseHTTPRequestHandler):
             data=json.loads(self.rfile.read(length) or b'{}')
             if not isinstance(data,dict): raise ValueError()
         with connect() as c:
+            if path in ('/api/v1/agenda','/api/v1/agenda/meta'):
+                auth=self.headers.get('Authorization','')
+                if not auth.startswith('Bearer ') or not re.fullmatch(r'[A-Za-z0-9_-]{40,128}',auth[7:]):
+                    self.send(401,{'error':'无效的 dashboard 凭据'}); return
+                digest=hashlib.sha256(auth[7:].encode()).hexdigest()
+                viewer=c.execute('SELECT * FROM viewers WHERE dashboard_token_hash=?',(digest,)).fetchone()
+                if not viewer or not viewer['active']:
+                    self.send(401,{'error':'无效的 dashboard 凭据'}); return
+                self.send(200,dashboard_meta(c,viewer) if path.endswith('/meta') else dashboard_agenda(c,viewer,self.path)); return
             if path=='/api/login' and method=='POST':
                 ip=self.client_address[0]; now=time.time(); c.execute('DELETE FROM attempts WHERE time<?',(now-900,))
                 if c.execute('SELECT count(*) FROM attempts WHERE ip=?',(ip,)).fetchone()[0]>=8: self.send(429,{'error':'尝试过多，请 15 分钟后重试'}); return
@@ -130,11 +142,26 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200,result);return
             if path=='/api/shares' and method=='GET':
                 rows=c.execute('SELECT v.*,u.name FROM viewers v JOIN users u ON u.id=v.user_id WHERE v.owner_id=?',(uid,)).fetchall()
-                result={'shares':[dict(id=r['user_id'],name=r['name'],active=bool(r['active']),version=r['version'],policy=json.loads(r['policy'])) for r in rows]}
+                result={'shares':[dict(id=r['user_id'],name=r['name'],active=bool(r['active']),version=r['version'],policy=json.loads(r['policy']),dashboard_token_enabled=bool(r['dashboard_token_hash'])) for r in rows]}
                 if actor['admin']:
                     result['owners']=[dict(r) for r in c.execute('SELECT id,name FROM users WHERE id NOT IN (SELECT user_id FROM viewers)')]
                     result['accounts']=[dict(r) for r in c.execute('SELECT v.user_id AS id,u.name,v.owner_id,v.active FROM viewers v JOIN users u ON u.id=v.user_id')]
                 self.send(200,result);return
+            if path=='/api/dashboard-token' and method=='POST':
+                target=c.execute('SELECT * FROM viewers WHERE user_id=? AND owner_id=?',(data.get('id'),uid)).fetchone()
+                if not target: self.send(403,{'error':'只能管理绑定给自己的展示账户'}); return
+                if data.get('action') not in ('rotate','revoke'): raise ValueError()
+                key='dashboard-token:'+str(uid);now=time.time()
+                c.execute('DELETE FROM attempts WHERE time<?',(now-900,))
+                if c.execute('SELECT count(*) FROM attempts WHERE ip=?',(key,)).fetchone()[0]>=8:
+                    self.send(429,{'error':'验证次数过多，请稍后重试'}); return
+                if not hmac.compare_digest(password_hash(str(data.get('current_password',''))[:1024],actor['salt']),actor['password']):
+                    c.execute('INSERT INTO attempts VALUES(?,?)',(key,now))
+                    self.send(403,{'error':'当前密码不正确'}); return
+                token=secrets.token_urlsafe(32) if data['action']=='rotate' else None
+                c.execute('UPDATE viewers SET dashboard_token_hash=? WHERE user_id=?',
+                          (hashlib.sha256(token.encode()).hexdigest() if token else None,target['user_id']))
+                self.send(200,{'ok':True,'token':token});return
             if path=='/api/shares' and method=='PUT':
                 target=c.execute('SELECT * FROM viewers WHERE user_id=? AND owner_id=?',(data.get('id'),uid)).fetchone()
                 if not target:self.send(403,{'error':'只能配置绑定给自己的展示账户'});return
@@ -165,7 +192,7 @@ class Handler(BaseHTTPRequestHandler):
                 elif action in ('rebind','active'):
                     target=data.get('id')
                     if not c.execute('SELECT 1 FROM viewers WHERE user_id=?',(target,)).fetchone():self.send(404,{'error':'展示账户不存在'});return
-                    if action=='rebind':c.execute('UPDATE viewers SET owner_id=?,policy=?,version=version+1 WHERE user_id=?',(owner['id'],json.dumps(DEFAULT_POLICY),target))
+                    if action=='rebind':c.execute('UPDATE viewers SET owner_id=?,policy=?,dashboard_token_hash=NULL,version=version+1 WHERE user_id=?',(owner['id'],json.dumps(DEFAULT_POLICY),target))
                     else:
                         if type(data.get('active')) is not bool:raise ValueError()
                         c.execute('UPDATE viewers SET active=?,version=version+1 WHERE user_id=?',(int(data['active']),target))
