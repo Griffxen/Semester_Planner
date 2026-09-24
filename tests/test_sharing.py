@@ -1,4 +1,4 @@
-import unittest,json,datetime as dt
+import unittest,json,datetime as dt,urllib.request,urllib.error
 import test_app
 import app
 from sharing import DEFAULT_POLICY,shared_state
@@ -19,6 +19,61 @@ class Sharing(unittest.TestCase):
         self.assertEqual(self.req('shares','PUT',dict(id=self.vid,version=current['version'],policy=p))[0],200)
     def viewer(self):
         self.req('logout','POST',{});self.login('viewer','1234')
+    def dashboard(self,path,token='',method='GET'):
+        request=urllib.request.Request(self.url+'/api/v1/'+path,method=method,
+            headers={'Authorization':'Bearer '+token} if token else {})
+        try: response=urllib.request.urlopen(request)
+        except urllib.error.HTTPError as error: response=error
+        return response.status,json.load(response)
+    def token(self):
+        status,result=self.req('dashboard-token','POST',dict(id=self.vid,action='rotate',current_password='test-password-123'))
+        self.assertEqual(status,200)
+        return result['token']
+    def test_dashboard_read_only_and_token_lifecycle(self):
+        self.assertEqual(self.dashboard('agenda?from=2026-09-15&to=2026-09-16')[0],401)
+        self.assertEqual(self.req('dashboard-token','POST',dict(id=self.vid,action='rotate',current_password='bad'))[0],403)
+        self.policy(timetable=True,notes=False)
+        self.req('timetable','POST',{})
+        self.req('tasks','POST',dict(title='visible',category='课程',date='2026-09-14',end_date='2026-09-18',due='2026-09-18T10:00',notes='SECRET'))
+        self.req('tasks','POST',dict(title='hidden',category='科研',date='2026-09-16'))
+        token=self.token()
+        self.assertTrue(self.req('shares')[1]['shares'][0]['dashboard_token_enabled'])
+        status,result=self.dashboard('agenda?from=2026-09-16&to=2026-09-17',token)
+        self.assertEqual(status,200);self.assertEqual(len(result['tasks']),1)
+        task=result['tasks'][0]
+        self.assertEqual(task['title'],'visible');self.assertEqual(task['due'],'2026-09-18T10:00')
+        self.assertEqual(task['date'],'2026-09-16');self.assertTrue(task['continues_before'])
+        self.assertEqual(task['notes'],'');self.assertNotIn('SECRET',json.dumps(result))
+        self.assertTrue(result['courses'])
+        self.assertEqual(self.dashboard('agenda/meta',token)[1]['categories'],[{'name':'课程','color':'#7185bd'}])
+        self.assertEqual(self.dashboard('agenda?from=2026-09-16&to=2026-09-17&include=courses',token)[1]['tasks'],[])
+        for path in ['agenda','agenda?from=2026-09-16&to=2026-10-17','agenda?from=2026-09-17&to=2026-09-16','agenda?from=2026-09-16&to=2026-09-17&include=journal']:
+            self.assertEqual(self.dashboard(path,token)[0],400)
+        self.assertEqual(self.dashboard('agenda?from=2026-09-16&to=2026-09-17',token,'POST')[0],405)
+        new_token=self.token();self.assertEqual(self.dashboard('agenda/meta',token)[0],401)
+        self.assertEqual(self.dashboard('agenda/meta',new_token)[0],200)
+        self.assertEqual(self.req('dashboard-token','POST',dict(id=self.vid,action='revoke',current_password='test-password-123'))[0],200)
+        self.assertEqual(self.dashboard('agenda/meta',new_token)[0],401)
+    def test_dashboard_busy_and_authorization_changes(self):
+        self.req('tasks','POST',dict(title='SECRET',category='课程',date='2026-09-16',end_date='2026-09-16',due='2026-09-16T10:00'))
+        self.policy(busy_only=True,timetable=True)
+        token=self.token()
+        result=self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)[1]
+        self.assertNotIn('SECRET',json.dumps(result));self.assertEqual(result['date_counts'],[{'date':'2026-09-16','count':1}])
+        self.assertEqual(self.dashboard('agenda/meta',token)[1]['categories'],[])
+        self.policy(enabled=False)
+        self.assertEqual(self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)[1]['tasks'],[])
+        self.assertEqual(self.dashboard('agenda/meta',token)[1]['semester'],{'name':'','start':''})
+        self.assertEqual(self.req('shares','POST',dict(action='active',id=self.vid,active=False,current_password='test-password-123'))[0],200)
+        self.assertEqual(self.dashboard('agenda/meta',token)[0],401)
+    def test_dashboard_rebind_revokes_token_and_due_stays_with_share(self):
+        self.req('tasks','POST',dict(title='outside due',category='课程',date='2026-09-16',due='2026-09-22T10:00'))
+        self.policy()
+        token=self.token()
+        task=self.dashboard('agenda?from=2026-09-16&to=2026-09-16',token)[1]['tasks'][0]
+        self.assertIsNone(task['due'])
+        self.assertEqual(self.req('shares','POST',dict(action='rebind',id=self.vid,owner_id=2,current_password='test-password-123'))[0],200)
+        self.assertEqual(self.dashboard('agenda/meta',token)[0],401)
     def test_default_denial_and_write_barrier(self):
         self.viewer();s=self.req('state')[1];self.assertFalse(s['share']['enabled']);self.assertEqual(s['tasks'],[])
         for endpoint,method in [('tasks','POST'),('tasks/other','DELETE'),('settings','PUT'),('journal','PUT'),('profile','PUT'),('categories','POST'),('timetable','GET'),('timetable','PUT'),('users','POST'),('shares','GET'),('shares','PUT'),('share-preview/'+str(self.vid),'GET')]:

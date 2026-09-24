@@ -11,6 +11,7 @@
 - 每日手记、公共课程模板、一键导入个人课表；课程和手记不计入任务统计。
 - 管理员、普通账户和只读展示账户；账户汇总、用户名修改、密码重置。
 - 按分类、日期、手记、课程和导出权限分享；仅占用模式隐藏任务细节与 DDL。
+- 展示账户专用的只读 Dashboard API：可按日期读取授权日程及实际课程，并提供学期与分类元数据；独立 Token 可轮换和撤销。
 - 浏览器本地 PNG 导出、JSON 归档和服务端 SQLite 备份。
 - 原位滑动确认、电脑端直接确认、失焦取消；内容修改使用版本检查避免覆盖。
 
@@ -58,10 +59,19 @@ PLANNER_DB=./data/production.db python3 app.py
 
 展示页定期复核权限；暂停后续访问不能撤回已阅读或下载内容。导出开关只控制内置导出入口，无法阻止截图。
 
+## 独立 Dashboard 接入
+
+给 dashboard 分配一个展示账户：管理员先绑定账户，日程所有者设置允许展示的分类、日期范围和课程，然后在“分享管理 → Dashboard 只读 Token”生成凭据。Token 只显示一次，存放在 dashboard **服务端**，由它请求 planner；不要写进浏览器代码。轮换或撤销 Token 不影响展示账户的网页登录。
+
+只读接口为 `GET /api/v1/agenda?from=YYYY-MM-DD&to=YYYY-MM-DD` 和 `GET /api/v1/agenda/meta`，都使用 `Authorization: Bearer <token>`。前者返回范围内的授权任务、实际课程及 DDL，后者返回学期和可见分类信息。分享设置始终是权限上限；暂停分享返回空日程。完整参数、字段、错误码、脱敏规则及调用示例见 [Dashboard API 说明](docs/DASHBOARD_API.md)。
+
+例如，dashboard 服务端可请求 `GET /api/v1/agenda?from=2026-09-15&to=2026-09-20&include=tasks,courses`。日期包含首尾，单次最多 31 天；课程已经展开为具体日期。`meta` 可用于显示学期名称和可见分类。两个接口都只接受 `GET`，并使用展示账户现有的分类、日期、已完成、备注、课表及仅占用授权。若要展示“未来 DDL”，dashboard 从已获准返回的任务中按 `due` 筛选；查询计划日期范围外的任务不会因其 DDL 落入范围而自动返回。
+
 ## 部署与开发
 
 - [部署、备份与恢复](docs/DEPLOYMENT.md)
 - [结构与设计](docs/ARCHITECTURE.md)
+- [Dashboard API 说明](docs/DASHBOARD_API.md)
 - [贡献与提交约定](CONTRIBUTING.md)
 - [安全边界与报告说明](SECURITY.md)
 - [许可证说明](docs/LICENSING.md)
