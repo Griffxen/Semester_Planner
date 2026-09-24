@@ -14,7 +14,7 @@
    ```
 
 4. 安装 `deploy/planner.service`，按实际安装路径调整后启用服务。
-5. 选用 Caddy 自动 HTTPS 或 Nginx 配合已有 TLS 入口。`nginx.conf` 仅是 HTTP 代理示例，不包含证书配置；`planner.service` 默认启用 Secure Cookie，纯 HTTP 调试需明确设 `PLANNER_SECURE=0`，否则登录 Cookie 无法正常使用。公网保留 HTTPS 与 Secure Cookie。
+5. 选用 Caddy 自动 HTTPS，或配置 `deploy/nginx-https.conf`。`deploy/nginx.conf` 仅是受保护网络或隧道内的 HTTP 示例；不要通过它跨设备传输 Dashboard Token。`planner.service` 默认启用 Secure Cookie，纯 HTTP 调试需明确设 `PLANNER_SECURE=0`，否则登录 Cookie 无法正常使用。
 6. 安装 `deploy/planner-backup.service` 和 timer，检查输出目录和文件权限，另行配置异机备份与保留周期。
 
 不要把本地数据库、`.private` 或演示凭据上传生产环境。不要用匿名示例 `timetable.json` 覆盖已有私人课程配置；现有数据库中的模板不会自动更新。
@@ -27,6 +27,22 @@ PLANNER_SSH_KEY=/path/to/private-key sh deploy/connect.sh
 ```
 
 默认本地端口 8766、远程端口 8765，可用 `PLANNER_LOCAL_PORT` / `PLANNER_REMOTE_PORT` 调整。脚本不包含固定主机、用户名或密钥路径。
+
+## 离线服务器的 HTTPS 与手动续签
+
+Web 服务器不能联网时，可在另一台可联网机器上通过 DNS-01 验证域名，签发证书后经 SSH 传输证书和私钥。DNSPod 可使用 [acme.sh 的 TencentCloud DNS API 插件](https://github.com/acmesh-official/acme.sh/wiki/dnsapi2#160-use-tencentcloud-dnspod-api)；其他 DNS 服务商也可使用支持 DNS-01 的客户端。DNS API 凭据只放在签发机器，不放到 Web 服务器或仓库。Let's Encrypt 的 [DNS-01 说明](https://letsencrypt.org/docs/challenge-types/#dns-01-challenge)涵盖了离线 Web 服务器的验证方式。
+
+首次部署时，将签发的 `fullchain.pem` 和匹配的 `privkey.pem` 安装到服务器的 `/etc/ssl/semester-planner/`：目录权限 700、私钥 600、所有者 root。复制 `deploy/nginx-https.conf`，把 `planner.example.org` 换成自己的域名，再启用为 Nginx 站点。执行 `nginx -t` 成功后才重新加载 Nginx。确认 Planner 服务的 `PLANNER_SECURE=1`；已有 HTTP 调试覆盖值必须移除。用另一台能到达服务器的设备访问 HTTPS，检查证书信任、页面、HTTP 跳转及无凭据 API 的 `401`。内网域名即使有公开证书，客户端仍需有到达服务器内网地址的网络路径。
+
+本仓库**不安装自动续签任务**。到期前，在签发机器手动更新证书，并导出 `fullchain.pem` 与 `privkey.pem`，再运行：
+
+```sh
+sh deploy/deploy-renewed-cert.sh \
+  planner.example.org /secure/path/fullchain.pem /secure/path/privkey.pem \
+  user@server.example.org /secure/path/ssh-key
+```
+
+脚本先检查域名、证书与私钥匹配及至少七天有效期；如果服务器已有同一证书就退出。否则通过 SSH 暂存文件、备份旧证书、安装新文件，并在 `nginx -t` 成功后重新加载；失败时恢复旧证书。它不接触数据库，也不会创建 cron、systemd timer 或 ACME 账户。续签日期由所选 ACME 客户端或证书 `notAfter` 决定；手动模式需要自己记得在到期前执行。
 
 ## 更新
 
