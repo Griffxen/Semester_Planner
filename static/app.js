@@ -13,7 +13,7 @@ function render(){syncReadonly(); cats=state.categories.map(c=>c.name);if(filter
 function openTask(date,id,edit=false){if(id&&!state.readonly&&!edit){showTaskDetails(id);return}if(state.readonly){const t=state.tasks.find(x=>x.id===id);if(t)showSharedDetail(t.title,`${t.continues_before?'← 此前已开始 · ':''}${taskWhen(t,true)}${t.continues_after?' · 此后仍继续 →':''}${t.due?'\n'+(state.share?.busy_only?'时间：':'截止：')+t.due.replace('T',' '):''}${t.notes?'\n\n'+t.notes:''}`);return}editing=id?state.tasks.find(x=>x.id===id):null;let f=$('#task-form');f.reset();for(let k of ['title','date','end_date','category','due','notes','start_time','end_time'])f.elements[k].value=editing?editing[k]:({date,end_date:date,category:cats[0]}[k]||'');f.elements.schedule_mode.value=editing?.start_time?'minute':'date';scheduleModeUI();f.elements.done.checked=!!editing?.done;$('#task-heading').textContent=editing?'编辑任务':'新建任务';$('#delete-button').hidden=!editing;$('#task-error').textContent='';taskSnapshot=JSON.stringify(Object.fromEntries(new FormData(f)));setTaskStep(1);$('#task-dialog').showModal();f.elements.title.focus()}
 async function mutation(fn){if(busy)return;busy=true;document.querySelectorAll('#task-form button,#settings-form button').forEach(b=>b.disabled=true);$('#save-status').textContent='正在保存…';try{await fn();await refresh();$('#save-status').textContent='已保存 · '+new Date().toLocaleTimeString('zh-CN');return true}catch(e){$('#save-status').textContent='保存失败 · 请重试';throw e}finally{busy=false;document.querySelectorAll('#task-form button,#settings-form button').forEach(b=>b.disabled=false)}}
 $('#login-form').onsubmit=async e=>{e.preventDefault();try{await api('login','POST',Object.fromEntries(new FormData(e.target)));previewId=null;await refresh();e.target.reset()}catch(e){$('#login-error').textContent=e.message}};
-$('#add-button').onclick=()=>openTask(today());$('#calendar').onclick=e=>{const restore=e.target.closest('[data-restore-course]');if(restore){restoreCourse(restore.dataset.restoreCourse,restore.dataset.courseDate);return}const course=e.target.closest('[data-course-key]');if(course){openCourseChange(course.dataset.courseKey,course.dataset.courseDate);return}let j=e.target.closest('[data-journal]');if(j){openJournal(j.dataset.journal);return}let t=e.target.closest('[data-task]'),d=e.target.closest('[data-date]');if(t)openTask(null,t.dataset.task);else if(d)openTask(d.dataset.date)};
+$('#add-button').onclick=()=>openTask(today());$('#calendar').onclick=e=>{const restore=e.target.closest('[data-restore-course]');if(restore){restoreCourse(restore.dataset.restoreCourse,restore.dataset.courseDate);return}const course=e.target.closest('[data-course-key]');if(course){showCourseDetails(course.dataset.courseKey,course.dataset.courseDate);return}let j=e.target.closest('[data-journal]');if(j){openJournal(j.dataset.journal);return}let t=e.target.closest('[data-task]'),d=e.target.closest('[data-date]');if(t)openTask(null,t.dataset.task);else if(d)openTask(d.dataset.date)};
 $('#calendar').ondragstart=e=>{if(state.readonly){e.preventDefault();return}let t=e.target.closest('[data-task]');if(t)e.dataTransfer.setData('text/plain',JSON.stringify({id:t.dataset.task,anchor:t.dataset.anchor||t.closest('[data-drop]')?.dataset.drop||state.tasks.find(x=>x.id===t.dataset.task).date}))};$('#calendar').ondragover=e=>{if(e.target.closest('[data-drop]'))e.preventDefault()};$('#calendar').ondrop=async e=>{if(state.readonly)return;let cell=e.target.closest('[data-drop]');if(!cell)return;e.preventDefault();let payload;try{payload=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}let t=state.tasks.find(t=>t.id===payload.id);if(!t||payload.anchor===cell.dataset.drop)return;let shift=Math.round((new Date(cell.dataset.drop)-new Date(payload.anchor))/86400000);openTimeAdjustment(t,shift)};
 $('#task-form').onsubmit=async e=>{e.preventDefault();if(!editing&&taskStep===1){setTaskStep(2);return}let data=Object.fromEntries(new FormData(e.target));data.done=e.target.elements.done.checked;if(data.schedule_mode==='date'){data.start_time='';data.end_time=''}else if(!data.start_time||!data.end_time||data.date+'T'+data.start_time>=data.end_date+'T'+data.end_time){$('#task-error').textContent='结束时间必须晚于开始时间';return}if(data.end_date<data.date){$('#task-error').textContent='计划完成日期不能早于开始日期';return}if(editing)data.version=editing.version;if(!await warnConflicts(data,editing?.id))return;try{if(await mutation(()=>api(editing?'tasks/'+editing.id:'tasks',editing?'PUT':'POST',data)))$('#task-dialog').close()}catch(e){$('#task-error').textContent=e.message}};
 $('#delete-button').onclick=async()=>{if(!editing||!await askConfirm('确定删除这项任务？'))return;try{let deleted={...editing};if(await mutation(()=>api('tasks/'+editing.id,'DELETE',{version:editing.version}))){undoDelete=deleted;$('#undo-delete').hidden=false;$('#task-dialog').close();toast('任务已删除，可点击底部按钮撤销')}}catch(e){$('#task-error').textContent=e.message}};
@@ -65,7 +65,7 @@ $('#account-form').onsubmit=async e=>{e.preventDefault();if(accountBusy)return;l
 function courseBlocks(rows){return rows.map(c=>{
  const body=`<span>${esc(c.time)}</span><div>${esc(c.name)}${c.cancelled?' · 已取消':''}</div><span>${esc(c.room)}</span>${c.adjusted?`<small class="course-original">原时间：${esc(c.original_date+' '+c.original_time)}</small>`:''}`;
  if(state.readonly)return `<div class="course-note">${body}</div>`;
- return `<div class="course-note ${c.cancelled?'course-cancelled':''}"><button class="course-open" data-course-key="${esc(c.course_key)}" data-course-date="${c.original_date}" title="调整本次课程">${body}</button>${c.adjusted?`<button class="course-restore" data-restore-course="${esc(c.course_key)}" data-course-date="${c.original_date}">恢复原课表</button>`:''}</div>`;
+ return `<div class="course-note ${c.cancelled?'course-cancelled':''}"><button class="course-open" data-course-key="${esc(c.course_key)}" data-course-date="${c.original_date}" title="查看课程详情">${body}</button></div>`;
  }).join('')}
 function courseMarkup(week,day){
  if(!$('#show-courses').checked)return '';
@@ -79,9 +79,22 @@ function renderCourseChanges(){
 }
 let courseSaving=false;
 async function restoreCourse(key,date){
- if(courseSaving||!await askConfirm('恢复这次课程的原课表安排？'))return;
+ if(courseSaving||confirmationPending||!await askConfirm('恢复这次课程的原课表安排？'))return false;
  courseSaving=true;
- try{await api('course-exceptions','PUT',{course_key:key,date,cancelled:false,new_date:'',new_time:''});await refresh();renderCourseChanges();toast('已恢复原课表')}catch(e){toast(e.message)}finally{courseSaving=false}
+ try{await api('course-exceptions','PUT',{course_key:key,date,cancelled:false,new_date:'',new_time:''});await refresh();renderCourseChanges();toast('已恢复原课表');return true}catch(e){toast(e.message);return false}finally{courseSaving=false}
+}
+function showCourseDetails(key,date){
+ if(state.readonly)return;
+ const course=(state.timetable||[]).find(c=>c.course_id===key),change=(state.course_exceptions||[]).find(x=>x.course_key===key&&x.date===date);
+ if(!course)return;
+ let dialog=$('#course-details');if(!dialog){dialog=document.createElement('dialog');dialog.id='course-details';document.body.append(dialog)}
+ const actual=(change?.new_date||date)+' '+(change?.new_time||course.time),original=date+' '+(change?.original_time||course.time);
+ dialog.innerHTML=`<div class="dialog-head"><h2>${esc(course.name)}</h2><button type="button" data-close aria-label="关闭">×</button></div><dl class="task-parameters"><dt>当前安排</dt><dd>${change?.cancelled?'本次课程已取消':esc(actual)}</dd><dt>原时间</dt><dd>${esc(original)}</dd><dt>地点</dt><dd>${esc(course.room||'未填写')}</dd><dt>状态</dt><dd>${change?.cancelled?'已取消':change?'已调课':'按原课表上课'}</dd></dl><div class="task-detail-actions"><button type="button" class="primary" data-change>调课 / 取消</button><button type="button" data-restore ${change?'':'disabled'}>恢复原课表</button></div>`;
+ dialog.querySelector('[data-close]').onclick=()=>{if(!courseSaving&&!confirmationPending)dialog.close()};
+ dialog.oncancel=e=>{if(courseSaving||confirmationPending)e.preventDefault()};
+ dialog.querySelector('[data-change]').onclick=()=>{if(courseSaving||confirmationPending)return;dialog.close();openCourseChange(key,date)};
+ dialog.querySelector('[data-restore]').onclick=async()=>{if(await restoreCourse(key,date))dialog.close()};
+ dialog.showModal();
 }
 function openCourseChange(key,date){
  if(state.readonly)return;
@@ -95,13 +108,17 @@ function openCourseChange(key,date){
  dialog.querySelector('[data-close]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close()};
  const toggle=()=>{for(const name of ['date','start_time','end_time'])form.elements[name].disabled=form.elements.cancelled.checked};
  form.elements.cancelled.onchange=toggle;toggle();original=snapshot();
- if(change)dialog.querySelector('[data-restore]').onclick=async()=>{await restoreCourse(key,date);if(!(state.course_exceptions||[]).some(x=>x.course_key===key&&x.date===date))dialog.close()};
+ if(change)dialog.querySelector('[data-restore]').onclick=async()=>{if(await restoreCourse(key,date))dialog.close()};
  form.onsubmit=async e=>{
-  e.preventDefault();if(courseSaving)return;
+  e.preventDefault();if(courseSaving||confirmationPending)return;
   const cancelled=form.elements.cancelled.checked,actual=form.elements.date.value,start=form.elements.start_time.value,end=form.elements.end_time.value,error=dialog.querySelector('[data-error]');
   if(!cancelled&&start>=end){error.textContent='结束时间必须晚于开始时间';return}
   const new_time=start+'–'+end,new_date=actual===date?'':actual;
   if(!cancelled&&(state.holidays||[]).some(h=>h.start<=actual&&actual<=h.end)){error.textContent='所选日期为节假日，请选择其他日期';return}
+  const restoring=!!change&&!cancelled&&!new_date&&new_time===course.time;
+  const message=cancelled?'取消「'+course.name+'」在 '+date+' 的这次课程？':restoring?'恢复「'+course.name+'」这次课程的原课表安排？':'将「'+course.name+'」这次课程调整为 '+actual+' '+new_time+'？';
+  lastActionButton=form.querySelector('.primary');
+  if(!await askConfirm(message,cancelled?'确认取消':restoring?'确认恢复':'确认保存')||!dialog.open)return;
   courseSaving=true;form.querySelector('.primary').disabled=true;
   try{await api('course-exceptions','PUT',{course_key:key,date,cancelled,new_date:cancelled?'':new_date,new_time:cancelled||new_time===course.time?'':new_time});await refresh();renderCourseChanges();dialog.close();toast(cancelled?'本次课程已取消':'本次课程已调整')}catch(e){error.textContent=e.message}finally{courseSaving=false;form.querySelector('.primary').disabled=false}
  };
