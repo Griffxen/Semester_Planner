@@ -1,6 +1,7 @@
 """Read-only sharing: policy validation and server-side projection."""
 import datetime as dt
 import json
+from courses import expand
 
 DEFAULT_POLICY = dict(enabled=False, categories=[], range='week', start='', end='', done=False,
                       notes=False, busy_only=False, journal='none', journal_dates=[], timetable=False, export=False)
@@ -37,12 +38,16 @@ def validate_policy(raw, categories):
     return p
 
 def private_state(c,uid):
-    return dict(categories=[dict(r) for r in c.execute('SELECT name,color,warn_days,urgent_days FROM categories WHERE user_id=? ORDER BY rowid',(uid,))],
+    result=dict(categories=[dict(r) for r in c.execute('SELECT name,color,warn_days,urgent_days FROM categories WHERE user_id=? ORDER BY rowid',(uid,))],
+                holidays=json.loads(c.execute('SELECT data FROM holidays WHERE id=1').fetchone()[0]),
+                course_exceptions=json.loads((c.execute('SELECT data FROM user_course_exceptions WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0]),
                 journal=[dict(r) for r in c.execute('SELECT date,body,version FROM journal WHERE user_id=?',(uid,))],
                 timetable=json.loads((c.execute('SELECT data FROM user_timetable WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0]),
                 user=dict(c.execute('SELECT name,admin,remark FROM users WHERE id=?',(uid,)).fetchone()),
                 settings=dict(c.execute('SELECT name,start FROM settings WHERE user_id=?',(uid,)).fetchone()),
                 tasks=[dict(r) for r in c.execute('SELECT id,title,category,date,end_date,start_time,end_time,due,notes,done,version FROM tasks WHERE user_id=?',(uid,))],readonly=False)
+    result['course_dates']=expand(result['timetable'],result['settings']['start'],result['holidays'],result['course_exceptions'],include_cancelled=True)
+    return result
 
 def shared_state(c,viewer,today=None):
     # This projection is used identically by viewers, owner previews and export checks.
@@ -59,7 +64,7 @@ def shared_state(c,viewer,today=None):
     busy=p.get('busy_only',False)
     account=dict(c.execute('SELECT name,remark FROM users WHERE id=?',(viewer['user_id'],)).fetchone())
     result=dict(user={**account,'admin':0,'viewer':True},settings=own['settings'],readonly=True,
-                categories=[],tasks=[],journal=[],timetable=[],course_dates=[],date_counts=[],
+                categories=[],tasks=[],journal=[],timetable=[],holidays=[],course_exceptions=[],course_dates=[],date_counts=[],
                 share=dict(owner=own['user']['remark'] or own['user']['name'],enabled=enabled,
                            start=lo,end=hi,export=bool(enabled and p['export']),
                            busy_only=busy,message='' if enabled else '分享尚未开启或已暂停'))
@@ -82,13 +87,8 @@ def shared_state(c,viewer,today=None):
     if p['journal']!='none':
         result['journal']=[dict(date=j['date'],body=j['body']) for j in own['journal'] if lo<=j['date']<=hi and (p['journal']=='all' or j['date'] in p['journal_dates'])]
     if p['timetable']:
-        date=dt.date.fromisoformat(lo)
-        while date.isoformat()<=hi:
-            week=(date-start).days//7+1
-            for course in own['timetable']:
-                if course['day']==date.weekday()+1 and course['start']<=week<=course['end'] and (course['weeks']=='all' or (week%2==1)==(course['weeks']=='odd')):
-                    result['course_dates'].append(dict(date=date.isoformat(),name=course['name'],time=course['time'],room=course['room']))
-            date+=dt.timedelta(days=1)
+        result['course_dates']=[{k:course[k] for k in ('date','name','time','room')}
+                                for course in own['course_dates'] if not course['cancelled'] and lo<=course['date']<=hi]
     if busy:
         # Never send the original identifiers, titles, status, category, notes or diary.
         counts={};ranges=[]

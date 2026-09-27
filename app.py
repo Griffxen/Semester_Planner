@@ -3,6 +3,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from sharing import init_sharing, DEFAULT_POLICY, validate_policy, private_state, shared_state, drop_category_permissions
 from dashboard_api import agenda as dashboard_agenda, meta as dashboard_meta
+from courses import migrate_ids, with_ids, occurs, is_holiday
 ROOT=Path(__file__).resolve().parent
 DB=Path(os.environ.get('PLANNER_DB', ROOT/'data/planner.db'))
 def connect():
@@ -16,9 +17,13 @@ def init():
         CREATE TABLE IF NOT EXISTS settings(user_id INTEGER PRIMARY KEY,name TEXT,start TEXT);
         CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY,user_id INTEGER,title TEXT,category TEXT,date TEXT,due TEXT,notes TEXT,done INTEGER,version INTEGER);''')
         c.executescript('CREATE TABLE IF NOT EXISTS timetable_template(id INTEGER PRIMARY KEY, data TEXT); CREATE TABLE IF NOT EXISTS user_timetable(user_id INTEGER PRIMARY KEY, data TEXT);')
+        c.execute('CREATE TABLE IF NOT EXISTS holidays(id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL)')
+        c.execute("INSERT OR IGNORE INTO holidays VALUES(1,'[]')")
+        c.execute('CREATE TABLE IF NOT EXISTS user_course_exceptions(user_id INTEGER PRIMARY KEY, data TEXT NOT NULL)')
         if not c.execute('SELECT 1 FROM timetable_template WHERE id=1').fetchone():
             seed=ROOT/'timetable.json'
             c.execute('INSERT INTO timetable_template VALUES(1,?)',(seed.read_text() if seed.exists() else '[]',))
+        migrate_ids(c)
         c.execute('CREATE TABLE IF NOT EXISTS journal(user_id INTEGER,date TEXT,body TEXT,version INTEGER,PRIMARY KEY(user_id,date))')
         if 'end_date' not in [r['name'] for r in c.execute('PRAGMA table_info(tasks)')]:
             c.execute('ALTER TABLE tasks ADD COLUMN end_date TEXT')
@@ -242,7 +247,7 @@ class Handler(BaseHTTPRequestHandler):
                     except sqlite3.IntegrityError:self.send(409,{'error':'手记已在其他页面创建，请刷新'});return
                 self.send(200,{'ok':True});return
             if path=='/api/timetable' and method=='GET':
-                self.send(200,{'courses':json.loads(c.execute('SELECT data FROM timetable_template WHERE id=1').fetchone()[0])});return
+                self.send(200,{'courses':json.loads(c.execute('SELECT data FROM timetable_template WHERE id=1').fetchone()[0]),'holidays':json.loads(c.execute('SELECT data FROM holidays WHERE id=1').fetchone()[0])});return
             if path=='/api/timetable' and method=='POST':
                 raw=c.execute('SELECT data FROM timetable_template WHERE id=1').fetchone()[0]
                 c.execute('INSERT OR REPLACE INTO user_timetable VALUES(?,?)',(uid,raw));self.send(200,{'ok':True});return
@@ -254,7 +259,40 @@ class Handler(BaseHTTPRequestHandler):
                     if not isinstance(x,dict) or not all(isinstance(x.get(k),str) and len(x[k])<=120 for k in ('name','room','time')) or not x['name'].strip():raise ValueError()
                     if x.get('weeks') not in ('all','odd','even') or not isinstance(x.get('day'),int) or not 1<=x['day']<=7:raise ValueError()
                     if not isinstance(x.get('start'),int) or not isinstance(x.get('end'),int) or not 1<=x['start']<=x['end']<=18:raise ValueError()
-                c.execute('UPDATE timetable_template SET data=? WHERE id=1',(json.dumps(courses,ensure_ascii=False),));self.send(200,{'ok':True});return
+                holidays=data.get('holidays',json.loads(c.execute('SELECT data FROM holidays WHERE id=1').fetchone()[0]))
+                if not isinstance(holidays,list) or len(holidays)>100:raise ValueError()
+                for x in holidays:
+                    if not isinstance(x,dict) or not isinstance(x.get('name'),str) or not 1<=len(x['name'].strip())<=60:raise ValueError()
+                    start=dt.date.fromisoformat(x.get('start','')).isoformat();end=dt.date.fromisoformat(x.get('end','')).isoformat()
+                    if end<start:raise ValueError()
+                    x.update(name=x['name'].strip(),start=start,end=end)
+                previous=json.loads(c.execute('SELECT data FROM timetable_template WHERE id=1').fetchone()[0])
+                courses=with_ids(courses,previous)
+                c.execute('UPDATE timetable_template SET data=? WHERE id=1',(json.dumps(courses,ensure_ascii=False),))
+                c.execute('UPDATE holidays SET data=? WHERE id=1',(json.dumps(holidays,ensure_ascii=False),));self.send(200,{'ok':True});return
+            if path=='/api/course-exceptions' and method=='PUT':
+                timetable=json.loads((c.execute('SELECT data FROM user_timetable WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0])
+                key=data.get('course_key');date=dt.date.fromisoformat(data.get('date','')).isoformat()
+                course=next((x for x in timetable if x['course_id']==key),None)
+                semester=dt.date.fromisoformat(c.execute('SELECT start FROM settings WHERE user_id=?',(uid,)).fetchone()[0])
+                cancelled=data.get('cancelled',False);new_date=data.get('new_date','');new_time=data.get('new_time','')
+                if type(cancelled) is not bool or not isinstance(new_date,str) or not isinstance(new_time,str) or len(new_time)>120:raise ValueError()
+                if new_date:new_date=dt.date.fromisoformat(new_date).isoformat()
+                if new_date and is_holiday(new_date,json.loads(c.execute('SELECT data FROM holidays WHERE id=1').fetchone()[0])):
+                    self.send(400,{'error':'所选日期为节假日，请选择其他日期'});return
+                if new_time:
+                    times=re.fullmatch(r'(\d{2}:\d{2})[–—-](\d{2}:\d{2})',new_time)
+                    if not times or times[1]>=times[2]:raise ValueError()
+                    for t in times.groups():dt.time.fromisoformat(t)
+                if cancelled and (new_date or new_time):raise ValueError()
+                old=json.loads((c.execute('SELECT data FROM user_course_exceptions WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0])
+                existing=next((x for x in old if x['course_key']==key and x['date']==date),{})
+                old=[x for x in old if not (x['course_key']==key and x['date']==date)]
+                if cancelled or new_date or new_time:
+                    if not course or (not existing and not occurs(course,semester,dt.date.fromisoformat(date))):raise ValueError()
+                    old.append(dict(course_key=key,date=date,cancelled=cancelled,new_date=new_date,new_time=new_time,original_time=existing.get('original_time') or course['time']))
+                c.execute('INSERT OR REPLACE INTO user_course_exceptions VALUES(?,?)',(uid,json.dumps(old,ensure_ascii=False)))
+                self.send(200,{'ok':True});return
             if path in ('/api/password','/api/users','/api/username') and method=='POST':
                 actor=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
                 if path=='/api/users' and not actor['admin']:
