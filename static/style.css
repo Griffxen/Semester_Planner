@@ -114,6 +114,7 @@ html[data-theme=dark] #share-banner{background:#294237;border-color:#3b5b49}html
 html[data-theme=dark] .journal-link.has-note{background:#294237;color:#b1d0bc}html[data-theme=dark] .range-tracks{background:var(--surface)}html[data-theme=dark] .range-caption{background:var(--surface-muted)}
 html[data-theme=dark] .course-open:hover{background:#2a3e36}html[data-theme=dark] .course-original,html[data-theme=dark] .course-note{color:#9aaca5}html[data-theme=dark] .course-change-row{border-color:var(--line)}
 html[data-theme=dark] .task-detail-actions button:not(.primary){background:#293b34;border-color:#40564c;color:#c7ddd1}html[data-theme=dark] .task-detail-actions button.soft-danger{background:#4a302d;border-color:#704540;color:#f0b4a8}
+html[data-theme=dark] .done{opacity:.78}
 html[data-theme=dark] .login{background:radial-gradient(ellipse at 20% 20%,#294237,transparent 65%)}html[data-theme=dark] .login-card{background:#20312bd9;border-color:#40564c;box-shadow:0 20px 90px #08110d66}
 html[data-theme=dark] dialog{box-shadow:0 20px 100px #08110dcc}html[data-theme=dark] dialog::backdrop{background:#08130eaa}
 html[data-theme=dark] .direct-confirm-corner{background:#294237;color:#c5e0d0;border-color:#4f7460}html[data-theme=dark] .confirm-in-place-handle{background:#355747;color:#d2ebdc;border-color:#5f8a70}
