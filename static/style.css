@@ -106,6 +106,7 @@ html[data-theme=dark] .stats>div:first-child{background:#294237;border-color:#3b
 html[data-theme=dark] .progress{background:#385344}html[data-theme=dark] .progress i{background:#83b875}
 html[data-theme=dark] .week-head,html[data-theme=dark] .week-label{background:var(--surface-muted)}
 html[data-theme=dark] .weekend{background:#1b2924}html[data-theme=dark] .is-today{background:#294236;box-shadow:inset 0 0 0 1px #6f9f7b}
+html[data-theme=dark] .range-days>div{border-color:var(--line)}html[data-theme=dark] .range-days .range-today{background:#294236;box-shadow:inset 1px 0 #6f9f7b,inset -1px 0 #6f9f7b,inset 0 -1px #6f9f7b}
 html[data-theme=dark] .exam .week-label{background:#40362d}html[data-theme=dark] .day-number{color:#a6b7af}
 html[data-theme=dark] .selected{background:#315044!important}html[data-theme=dark] .view-switch,html[data-theme=dark] main>nav{background:#263a32;border-color:#3d554a}
 html[data-theme=dark] .view-switch button.active,html[data-theme=dark] main>nav .active{background:#4d8a6d}

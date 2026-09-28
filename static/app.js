@@ -2,8 +2,12 @@ function dateCount(date){return (state.date_counts||[]).find(x=>x.date===date)?.
 function dateCountMarkup(date){const n=dateCount(date);return n?`<div class="date-arrangements">另有 ${n} 项安排</div>`:''}
 const $=s=>document.querySelector(s);let cats=['课程','科研','考试','个人'];let previewId=null;let state,filter='',mode='all',editing=null,busy=false,taskSnapshot='',settingsSnapshot='',undoDelete=null;
 const themeKey='semester-theme';
-function setTheme(theme){document.documentElement.dataset.theme=theme;try{localStorage.setItem(themeKey,theme)}catch(e){};const button=$('#theme-toggle');if(button){const dark=theme==='dark';button.textContent=dark?'☀ 浅色模式':'☾ 深色模式';button.setAttribute('aria-pressed',String(dark));button.title=dark?'切换到浅色模式':'切换到深色模式'}if(state)applyCategoryColors()}
-setTheme(document.documentElement.dataset.theme==='dark'?'dark':'light');
+function systemTheme(){return typeof matchMedia==='function'&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}
+function storedTheme(){try{const saved=localStorage.getItem(themeKey);return saved==='dark'||saved==='light'?saved:''}catch(e){return ''}}
+function setTheme(theme,persist=true){document.documentElement.dataset.theme=theme;if(persist){try{localStorage.setItem(themeKey,theme)}catch(e){}}const button=$('#theme-toggle');if(button){const dark=theme==='dark';button.textContent=dark?'☀ 浅色模式':'☾ 深色模式';button.setAttribute('aria-pressed',String(dark));button.title=dark?'切换到浅色模式':'切换到深色模式'}if(state)applyCategoryColors()}
+setTheme(storedTheme()||systemTheme(),false);
+const systemThemeQuery=typeof matchMedia==='function'?matchMedia('(prefers-color-scheme: dark)'):null;
+if(systemThemeQuery){const syncSystemTheme=()=>{if(!storedTheme())setTheme(systemTheme(),false)};if(systemThemeQuery.addEventListener)systemThemeQuery.addEventListener('change',syncSystemTheme);else if(systemThemeQuery.addListener)systemThemeQuery.addListener(syncSystemTheme)}
 $('#theme-toggle').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const add=(s,n)=>{let d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
