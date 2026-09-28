@@ -92,3 +92,31 @@ button.confirm-in-place{outline:1px solid #91ab9e;outline-offset:-1px}.confirm-i
 .range-lane{row-gap:4px}.range-lane .range-bar{align-self:stretch}
 
 .course-open{display:block;width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}.course-open:hover{background:#f2f5f6}.course-original{display:block;margin-top:3px;color:#81918b;font-size:9px}.course-restore{padding:2px 5px;margin-top:4px;font-size:10px;color:#526b61}.course-cancelled .course-open{opacity:.65}.course-change-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e9edeb;font-size:12px}.course-change-row button{flex-shrink:0}
+
+/* User-selectable dark theme. Keep the light palette as the default. */
+:root{--surface:#fff;--surface-muted:#f6f8f3;--surface-subtle:#fafbf8}
+html[data-theme=dark]{color-scheme:dark;--ink:#e4eee9;--muted:#9aaca5;--green:#6eaf8f;--line:#344941;--paper:#17231f;--surface:#202e29;--surface-muted:#263832;--surface-subtle:#1c2a25}
+html[data-theme=dark] body{background:var(--paper);color:var(--ink)}
+html[data-theme=dark] button{background:var(--surface);color:var(--ink);border-color:var(--line)}
+html[data-theme=dark] button:hover{filter:brightness(1.12)}
+html[data-theme=dark] aside{background:#1c2a25;border-right-color:var(--line)}
+html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{background:#24352f;color:var(--ink);border-color:#40564c}
+html[data-theme=dark] .stats>div,html[data-theme=dark] .calendar-panel,html[data-theme=dark] dialog{background:var(--surface);border-color:var(--line)}
+html[data-theme=dark] .stats>div:first-child{background:#294237;border-color:#3b5b49}
+html[data-theme=dark] .progress{background:#385344}html[data-theme=dark] .progress i{background:#83b875}
+html[data-theme=dark] .week-head,html[data-theme=dark] .week-label{background:var(--surface-muted)}
+html[data-theme=dark] .weekend{background:#1b2924}html[data-theme=dark] .is-today{background:#294236;box-shadow:inset 0 0 0 1px #6f9f7b}
+html[data-theme=dark] .exam .week-label{background:#40362d}html[data-theme=dark] .day-number{color:#a6b7af}
+html[data-theme=dark] .selected{background:#315044!important}html[data-theme=dark] .view-switch,html[data-theme=dark] main>nav{background:#263a32;border-color:#3d554a}
+html[data-theme=dark] .view-switch button.active,html[data-theme=dark] main>nav .active{background:#4d8a6d}
+html[data-theme=dark] #search,html[data-theme=dark] #course-scope{background:#24352f}
+html[data-theme=dark] #share-banner{background:#294237;border-color:#3b5b49}html[data-theme=dark] .share-row,html[data-theme=dark] .inline-confirm{background:#263a32;border-color:#3d554a}
+html[data-theme=dark] .journal-link.has-note{background:#294237;color:#b1d0bc}html[data-theme=dark] .range-tracks{background:var(--surface)}html[data-theme=dark] .range-caption{background:var(--surface-muted)}
+html[data-theme=dark] .course-open:hover{background:#2a3e36}html[data-theme=dark] .course-original,html[data-theme=dark] .course-note{color:#9aaca5}html[data-theme=dark] .course-change-row{border-color:var(--line)}
+html[data-theme=dark] .task-detail-actions button:not(.primary){background:#293b34;border-color:#40564c;color:#c7ddd1}html[data-theme=dark] .task-detail-actions button.soft-danger{background:#4a302d;border-color:#704540;color:#f0b4a8}
+html[data-theme=dark] .login{background:radial-gradient(ellipse at 20% 20%,#294237,transparent 65%)}html[data-theme=dark] .login-card{background:#20312bd9;border-color:#40564c;box-shadow:0 20px 90px #08110d66}
+html[data-theme=dark] dialog{box-shadow:0 20px 100px #08110dcc}html[data-theme=dark] dialog::backdrop{background:#08130eaa}
+html[data-theme=dark] .direct-confirm-corner{background:#294237;color:#c5e0d0;border-color:#4f7460}html[data-theme=dark] .confirm-in-place-handle{background:#355747;color:#d2ebdc;border-color:#5f8a70}
+html[data-theme=dark] .theme-toggle{background:#294237;color:#c5e0d0;border-color:#4f7460}
+.theme-toggle{position:fixed;top:18px;right:22px;z-index:20;border:1px solid #d4dfd5;border-radius:999px;padding:8px 13px;background:#ffffffd9;color:var(--green);font-size:12px;box-shadow:0 5px 20px #39523912}
+@media(max-width:700px){.theme-toggle{top:10px;right:10px;padding:6px 9px;font-size:11px}.login .theme-toggle{top:10px}}

@@ -1,6 +1,10 @@
 function dateCount(date){return (state.date_counts||[]).find(x=>x.date===date)?.count||0}
 function dateCountMarkup(date){const n=dateCount(date);return n?`<div class="date-arrangements">另有 ${n} 项安排</div>`:''}
 const $=s=>document.querySelector(s);let cats=['课程','科研','考试','个人'];let previewId=null;let state,filter='',mode='all',editing=null,busy=false,taskSnapshot='',settingsSnapshot='',undoDelete=null;
+const themeKey='semester-theme';
+function setTheme(theme){document.documentElement.dataset.theme=theme;try{localStorage.setItem(themeKey,theme)}catch(e){};const button=$('#theme-toggle');if(button){const dark=theme==='dark';button.textContent=dark?'☀ 浅色模式':'☾ 深色模式';button.setAttribute('aria-pressed',String(dark));button.title=dark?'切换到浅色模式':'切换到深色模式'}if(state)applyCategoryColors()}
+setTheme(document.documentElement.dataset.theme==='dark'?'dark':'light');
+$('#theme-toggle').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const add=(s,n)=>{let d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -152,7 +156,7 @@ $('#profile-close').onclick=closeProfile;$('#profile-dialog').addEventListener('
 $('#profile-form').onsubmit=async e=>{e.preventDefault();if(profileBusy)return;profileBusy=true;e.target.querySelector('.primary').disabled=true;try{await api('profile','PUT',{remark:e.target.elements.remark.value});await refresh();$('#profile-dialog').close();toast('账户备注已保存')}catch(e){$('#profile-error').textContent=e.message}finally{profileBusy=false;$('#profile-form .primary').disabled=false}};
 
 function tint(hex,amount){const rgb=hex.slice(1).match(/../g).map(x=>parseInt(x,16));return '#'+rgb.map(v=>Math.round(amount>=0?v+(255-v)*amount:v*(1+amount)).toString(16).padStart(2,'0')).join('')}
-function applyCategoryColors(){state.categories.forEach((c,i)=>document.querySelectorAll('.cat-'+i).forEach(el=>{el.style.backgroundColor=el.classList.contains('dot')?c.color:tint(c.color,.88);el.style.color=tint(c.color,-.3);el.style.borderColor=c.color}))}
+function applyCategoryColors(){const dark=document.documentElement.dataset.theme==='dark';state.categories.forEach((c,i)=>document.querySelectorAll('.cat-'+i).forEach(el=>{el.style.backgroundColor=el.classList.contains('dot')?c.color:tint(c.color,dark?.58:.88);el.style.color=dark?tint(c.color,.72):tint(c.color,-.3);el.style.borderColor=dark?tint(c.color,.12):c.color}))}
 function categoryRows(){ $('#category-rows').innerHTML=state.categories.map((c,i)=>`<form class="category-row" data-category-index="${i}"><input name="name" aria-label="分类名称" value="${esc(c.name)}" maxlength="20" required><input name="color" aria-label="分类颜色" type="color" value="${c.color}"><label class="deadline-threshold">黄 · 天数 ≤<input name="warn_days" type="number" min="0" max="3650" step="1" required value="${c.warn_days??7}"></label><label class="deadline-threshold">红 · 天数 ≤<input name="urgent_days" type="number" min="0" max="3650" step="1" required value="${c.urgent_days??2}"></label><button class="category-save">保存</button><details class="category-remove"><summary>迁移 / 删除</summary><div><select name="target" aria-label="删除时迁移到"><option value="">迁移到…</option>${state.categories.filter(x=>x.name!==c.name).map(x=>`<option>${esc(x.name)}</option>`).join('')}</select><button type="button" data-delete-category="${i}" ${state.categories.length===1?'disabled':''}>删除</button></div></details></form>`).join('')}
 $('#manage-categories').onclick=()=>{categoryRows();$('#category-error').textContent='';$('#category-dialog').showModal()};
 $('#category-close').onclick=async()=>{if(!await askConfirm('关闭分类管理？未点击保存的修改将丢弃。'))return;$('#category-dialog').close()};
