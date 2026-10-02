@@ -91,7 +91,7 @@ button.confirm-in-place{outline:1px solid #91ab9e;outline-offset:-1px}.confirm-i
 
 .range-lane{row-gap:4px}.range-lane .range-bar{align-self:stretch}
 
-.course-open{display:block;width:100%;padding:0;border:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}.course-open:hover{background:#f2f5f6}.course-original{display:block;margin-top:3px;color:#81918b;font-size:9px}.course-restore{padding:2px 5px;margin-top:4px;font-size:10px;color:#526b61}.course-cancelled .course-open{opacity:.65}.course-change-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e9edeb;font-size:12px}.course-change-row button{flex-shrink:0}
+.course-open{display:block;width:calc(100% + 5px);margin-left:-5px;padding:0 0 0 5px;border:0;border-radius:0 7px 7px 0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}.course-open:hover{background:#f2f5f6}.course-original{display:block;margin-top:3px;color:#81918b;font-size:9px}.course-restore{padding:2px 5px;margin-top:4px;font-size:10px;color:#526b61}.course-cancelled .course-open{opacity:.65}.course-change-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e9edeb;font-size:12px}.course-change-row button{flex-shrink:0}
 
 /* User-selectable dark theme. Keep the light palette as the default. */
 :root{--surface:#fff;--surface-muted:#f6f8f3;--surface-subtle:#fafbf8}
