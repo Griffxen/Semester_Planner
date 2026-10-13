@@ -29,6 +29,28 @@ class API(unittest.TestCase):
   self.assertEqual(self.req('tasks/'+task['id'],'PUT',{**task,'end_date':'2026-09-14'})[0],400)
   self.assertEqual(self.req('tasks/'+task['id'],'PUT',{**task,'date':'2026-09-17','end_date':'2026-09-23'})[0],200)
   updated=next(t for t in self.req('state')[1]['tasks'] if t['id']==task['id']);self.assertEqual(updated['due'],data['due']);self.assertEqual(updated['end_date'],'2026-09-23')
+ def test_milestones_and_short_title(self):
+  self.login()
+  data=dict(title='节点功能测试',short_title='测试',category='课程',date='2026-09-15',end_date='2026-10-01',milestones=[dict(label='最终提交',stop_at='2026-10-01T23:59',done=False),dict(label='初稿',stop_at='2026-09-18T10:00+08:00',done=True)])
+  self.assertEqual(self.req('tasks','POST',data)[0],200)
+  task=next(t for t in self.req('state')[1]['tasks'] if t['title']==data['title'])
+  self.assertEqual(task['short_title'],'测试');self.assertEqual(task['milestones'][0],dict(label='初稿',stop_at='2026-09-18T10:00+08:00',done=True));self.assertFalse(task['done'])
+  path='tasks/'+task['id']
+  legacy={k:v for k,v in task.items() if k not in ('milestones','short_title')}
+  self.assertEqual(self.req(path,'PUT',{**legacy,'notes':'old client'})[0],200)
+  updated=next(t for t in self.req('state')[1]['tasks'] if t['id']==task['id'])
+  self.assertEqual(updated['milestones'],task['milestones']);self.assertEqual(updated['short_title'],'测试')
+  updated['milestones'][1]['done']=True
+  self.assertEqual(self.req(path,'PUT',updated)[0],200)
+  self.assertEqual(self.req(path,'PUT',updated)[0],409)
+  for bad in [None,{},[dict(stop_at='2026-02-30T10:00')],[dict(stop_at='2026-09-18T10:00Z')],[dict(stop_at='2026-09-18T10:00',done='yes')],[dict(stop_at='2026-09-18T10:00',label='x'*81)],[dict(stop_at='2026-09-18T10:00')]*51]:
+   self.assertEqual(self.req('tasks','POST',{**data,'milestones':bad})[0],400)
+  self.assertEqual(self.req('tasks','POST',{**data,'short_title':'x'*41})[0],400)
+  self.assertEqual(self.req('tasks','POST',{**data,'short_title':None})[0],400)
+  latest=next(t for t in self.req('state')[1]['tasks'] if t['id']==task['id'])
+  self.assertEqual(self.req(path,'PUT',{**latest,'milestones':[],'short_title':''})[0],200)
+  final=next(t for t in self.req('state')[1]['tasks'] if t['id']==task['id'])
+  self.assertEqual(final['milestones'],[]);self.assertEqual(final['short_title'],'')
  def test_account_management(self):
   self.login();d={'action':'create','name':'charlie','current_password':'test-password-123','password':'1234'}
   self.assertEqual(self.req('users','POST',d)[0],200)

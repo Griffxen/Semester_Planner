@@ -52,9 +52,11 @@ curl --fail-with-body \
   "share_enabled": true,
   "busy_only": false,
   "tasks": [{
-    "id": "示例ID", "title": "准备周会", "category": "科研",
+    "id": "示例ID", "title": "准备周会", "short_title": "周会", "category": "科研",
     "date": "2026-09-16", "end_date": "2026-09-17",
     "start_time": "", "end_time": "", "due": "2026-09-18T15:00",
+    "milestones": [{"label": "材料完成", "display_name": "周会 · 材料完成",
+                    "stop_at": "2026-09-17T12:00+08:00", "done": false}],
     "done": false, "notes": "", "continues_before": false,
     "continues_after": false
   }],
@@ -63,9 +65,11 @@ curl --fail-with-body \
 }
 ```
 
+`short_title` 是主任务的选填简称，未设置时为空字符串。`milestones` 是按时间排序的关键节点列表，未设置时为 `[]`。每个节点的 `label` 是原始名称，`display_name` 使用“简称（未填则用完整任务名） · 节点名称（未填则用关键节点）”；`stop_at` 是带 `+08:00` 时区的 ISO 8601 时间，精确到分钟，`done` 是节点自己的完成状态，与主任务完成状态独立。节点时间不随计划调整移动，也不会自动结束任务。节点列表只包含同时落在查询日期和分享授权日期内的节点；仅占用模式返回空列表且隐藏简称。主任务改名或简称修改后，后续 API 请求会使用新名称。
+
 `courses` 是**个人已导入课表**按学期起始日、星期、单双周和起止周展开后的课程实例，不是公共课程模板。未导入课表、未授权课表或该区间无课时返回空数组。
 
-`due` 是任务自己的独立截止时间，不随计划区间裁剪；但如果它落在分享授权日期之外，会返回 `null`。没有 DDL、或仅占用模式隐藏 DDL 时也返回 `null`。`notes` 仅在分享设置允许时有内容。仅占用模式沿用展示页脱敏逻辑：任务名、分类、原始 ID、备注、DDL 与课程地点不会泄露；日期级任务可能被汇总到 `date_counts`，所以 dashboard 应同时读取它。`include` 未选中的数组仍返回 `[]`。
+`due` 是任务自己的独立截止时间，不随计划区间裁剪；但如果它落在分享授权日期之外，会返回 `null`。没有 DDL、或仅占用模式隐藏 DDL 时也返回 `null`。`notes` 仅在分享设置允许时有内容。仅占用模式沿用展示页脱敏逻辑：任务名、分类、原始 ID、备注、DDL、简称、关键节点与课程地点不会泄露；日期级任务可能被汇总到 `date_counts`，所以 dashboard 应同时读取它。`include` 未选中的数组仍返回 `[]`。
 
 ### `GET /api/v1/agenda/meta`
 

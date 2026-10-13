@@ -127,3 +127,21 @@ html[data-theme=dark] .theme-toggle{background:#294237;color:#c5e0d0;border-colo
 body,aside,main,button,input,select,textarea,dialog,.stats>div,.calendar-panel,.toolbar,.week-head,.week-label,.day,.range-tracks,.range-caption,.login-card,#share-banner,.view-switch,.theme-toggle{transition:background-color .28s ease,color .28s ease,border-color .28s ease,box-shadow .28s ease}
 .task,.range-bar,.dot{transition:background-color .28s ease,color .28s ease,border-color .28s ease}
 @media(prefers-reduced-motion:reduce){body,aside,main,button,input,select,textarea,dialog,.stats>div,.calendar-panel,.toolbar,.week-head,.week-label,.day,.range-tracks,.range-caption,.login-card,#share-banner,.view-switch,.theme-toggle,.task,.range-bar,.dot{transition:none!important}}
+
+/* Key checkpoints share the task's own color and remain visible in both themes. */
+.milestone-editor{border:1px solid var(--line,#dce2da);border-radius:8px;padding:12px;margin:14px 0;min-width:0}
+.milestone-editor legend{font-size:13px}.milestone-editor p{font-size:12px;margin-bottom:0}
+.milestone-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) auto auto;gap:8px;align-items:end;margin-bottom:10px}
+.milestone-row label{min-width:0}.milestone-row input{width:100%;min-width:0}.milestone-row button{margin-bottom:10px}
+.range-bar{position:relative}.range-bar:has(.milestone-marker){padding-top:20px}
+.milestone-marker{position:absolute;top:5px;bottom:4px;border-left:2px dashed currentColor;opacity:.5;pointer-events:none}
+.milestone-marker>span{position:absolute;top:-5px;left:-6px;font-size:12px;line-height:14px}
+.milestone-summary{display:flex!important;flex-wrap:wrap;gap:3px 12px;margin-top:4px;font-size:11px;white-space:normal;overflow-wrap:anywhere}
+.task-parameters .milestone-summary{font-size:13px}.milestone-summary span{display:block}
+@media(max-width:700px){.milestone-row{grid-template-columns:minmax(0,1fr) auto}.milestone-row label{grid-column:1}.milestone-row button{grid-column:2;grid-row:1/3}.range-bar:has(.milestone-marker){padding-top:20px}}
+
+.milestone-row .milestone-check{display:flex;align-items:center;gap:4px;margin-bottom:12px;white-space:nowrap}
+.milestone-check input{width:auto}.milestone-done{opacity:.65;text-decoration:line-through}
+.milestone-complete{border-left-style:solid}.milestone-detail{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0}
+.milestone-detail small{display:block;font-size:12px;margin-top:3px}.milestone-detail button{flex-shrink:0;font-size:12px}
+@media(max-width:700px){.milestone-row{grid-template-columns:minmax(0,1fr) auto}.milestone-row .milestone-check{grid-column:1;margin-bottom:0}.milestone-row button{grid-row:1/4}}

@@ -29,6 +29,28 @@ class Sharing(unittest.TestCase):
         status,result=self.req('dashboard-token','POST',dict(id=self.vid,action='rotate',current_password='test-password-123'))
         self.assertEqual(status,200)
         return result['token']
+    def test_milestone_dashboard_names_and_privacy(self):
+        nodes=[dict(label='SECRET',stop_at='2026-09-14T10:00'),dict(label='初稿',stop_at='2026-09-16T18:00',done=True),dict(label='提交',stop_at='2026-09-19T23:59'),dict(label='SECRET',stop_at='2026-09-21T10:00')]
+        self.assertEqual(self.req('tasks','POST',dict(title='完整的主任务名称',short_title='简称',category='课程',date='2026-09-14',end_date='2026-09-22',milestones=nodes))[0],200)
+        self.policy();token=self.token()
+        status,result=self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)
+        self.assertEqual(status,200);task=result['tasks'][0]
+        self.assertEqual(task['short_title'],'简称');self.assertEqual(len(task['milestones']),2)
+        self.assertEqual(task['milestones'][0],dict(label='初稿',display_name='简称 · 初稿',stop_at='2026-09-16T18:00+08:00',done=True))
+        self.assertNotIn('SECRET',json.dumps(result))
+        narrowed=self.dashboard('agenda?from=2026-09-16&to=2026-09-16',token)[1]['tasks'][0]
+        self.assertEqual(len(narrowed['milestones']),1)
+        own=self.req('state')[1]['tasks'][0]
+        self.assertEqual(self.req('tasks/'+own['id'],'PUT',{**own,'short_title':''})[0],200)
+        fallback=self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)[1]['tasks'][0]['milestones'][0]
+        self.assertEqual(fallback['display_name'],'完整的主任务名称 · 初稿')
+        self.policy(busy_only=True)
+        busy=self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)[1]
+        for task in busy['tasks']:
+            self.assertEqual(task['milestones'],[]);self.assertEqual(task['short_title'],'')
+        for secret in ['初稿','提交','完整的主任务名称','简称']:self.assertNotIn(secret,json.dumps(busy,ensure_ascii=False))
+        self.policy(enabled=False)
+        self.assertEqual(self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)[1]['tasks'],[])
     def test_dashboard_read_only_and_token_lifecycle(self):
         self.assertEqual(self.dashboard('agenda?from=2026-09-15&to=2026-09-16')[0],401)
         self.assertEqual(self.req('dashboard-token','POST',dict(id=self.vid,action='rotate',current_password='bad'))[0],403)

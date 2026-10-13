@@ -35,8 +35,10 @@ def agenda(c, viewer, raw_path):
             if task['date'] > hi or task['end_date'] < lo:
                 continue
             item = {k: task.get(k) for k in ('id', 'title', 'category', 'date', 'end_date',
-                                              'start_time', 'end_time', 'done', 'notes')}
+                                              'start_time', 'end_time', 'done', 'notes', 'short_title')}
             item['due'] = task.get('due') or None
+            item['milestones'] = [{**m, 'display_name': (task.get('short_title') or task['title']) + ' · ' + (m['label'] or '关键节点')}
+                                  for m in task.get('milestones', []) if lo <= m['stop_at'][:10] <= hi]
             item['continues_before'] = task['date'] < lo or task.get('continues_before', False)
             item['continues_after'] = task['end_date'] > hi or task.get('continues_after', False)
             item['date'] = max(lo, task['date'])

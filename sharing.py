@@ -45,7 +45,8 @@ def private_state(c,uid):
                 timetable=json.loads((c.execute('SELECT data FROM user_timetable WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0]),
                 user=dict(c.execute('SELECT name,admin,remark FROM users WHERE id=?',(uid,)).fetchone()),
                 settings=dict(c.execute('SELECT name,start FROM settings WHERE user_id=?',(uid,)).fetchone()),
-                tasks=[dict(r) for r in c.execute('SELECT id,title,category,date,end_date,start_time,end_time,due,notes,done,version FROM tasks WHERE user_id=?',(uid,))],readonly=False)
+                tasks=[dict(r) for r in c.execute('SELECT id,title,category,date,end_date,start_time,end_time,due,notes,done,version,milestones,short_title FROM tasks WHERE user_id=?',(uid,))],readonly=False)
+    for task in result['tasks']:task['milestones']=json.loads(task['milestones'])
     result['course_dates']=expand(result['timetable'],result['settings']['start'],result['holidays'],result['course_exceptions'],include_cancelled=True)
     return result
 
@@ -75,11 +76,12 @@ def shared_state(c,viewer,today=None):
     result['categories']=[x for x in own['categories'] if x['name'] in p['categories']]
     for t in own['tasks']:
         if t['category'] not in p['categories'] or (t['done'] and not p['done']) or t['date']>hi or t['end_date']<lo:continue
-        visible={k:t[k] for k in ('id','title','category','date','end_date','start_time','end_time','due','notes','done')}
+        visible={k:t[k] for k in ('id','title','category','date','end_date','start_time','end_time','due','notes','done','short_title')}
         visible.update(continues_before=t['date']<lo,continues_after=t['end_date']>hi,
                        date=max(t['date'],lo),end_date=min(t['end_date'],hi),
                        notes=t['notes'] if p['notes'] else '',
-                       due=t['due'] if t['due'] and lo<=t['due'][:10]<=hi else '')
+                       due=t['due'] if t['due'] and lo<=t['due'][:10]<=hi else '',
+                       milestones=[m for m in t['milestones'] if lo<=m['stop_at'][:10]<=hi])
         if t['start_time']:
             visible['start_time']='00:00' if t['date']<lo else t['start_time']
             visible['end_time']='23:59' if t['end_date']>hi else t['end_time']
@@ -97,7 +99,7 @@ def shared_state(c,viewer,today=None):
             if task['date']!=task['end_date'] or task['continues_before'] or task['continues_after']:
                 ranges.append(dict(id='arrangement-'+str(len(ranges)),title='另有安排',category='另有安排',
                                    date=task['date'],end_date=task['end_date'],start_time='',end_time='',
-                                   due='',notes='',done=False,continues_before=task['continues_before'],
+                                   due='',notes='',done=False,short_title='',milestones=[],continues_before=task['continues_before'],
                                    continues_after=task['continues_after']))
             else:
                 key=task['date'];counts[key]=counts.get(key,0)+1
@@ -105,7 +107,7 @@ def shared_state(c,viewer,today=None):
         slots=sorted(set((t['date'],t['end_date'],'',t['start_time'],t['end_time'],t['continues_before'],t['continues_after']) for t in result['tasks'] if t['start_time']))
         result['categories']=[dict(name='已占用',color='#81918b')] if slots or result['course_dates'] else []
         if ranges:result['categories'].append(dict(name='另有安排',color='#81918b'))
-        result['tasks']=[dict(id='busy-'+str(i),title='已占用',category='已占用',date=a,end_date=b,due=d,start_time=st,end_time=et,notes='',done=False,continues_before=before,continues_after=after) for i,(a,b,d,st,et,before,after) in enumerate(slots)]+ranges
+        result['tasks']=[dict(id='busy-'+str(i),title='已占用',category='已占用',date=a,end_date=b,due=d,start_time=st,end_time=et,notes='',done=False,short_title='',milestones=[],continues_before=before,continues_after=after) for i,(a,b,d,st,et,before,after) in enumerate(slots)]+ranges
         result['journal']=[]
         result['course_dates']=[dict(date=d,time=t,name='已占用',room='') for d,t in sorted(set((x['date'],x['time']) for x in result['course_dates']))]
     return result

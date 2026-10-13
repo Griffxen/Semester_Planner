@@ -6,6 +6,19 @@ from dashboard_api import agenda as dashboard_agenda, meta as dashboard_meta
 from courses import migrate_ids, with_ids, occurs, is_holiday
 ROOT=Path(__file__).resolve().parent
 DB=Path(os.environ.get('PLANNER_DB', ROOT/'data/planner.db'))
+def validate_milestones(raw):
+    if not isinstance(raw,list) or len(raw)>50: raise ValueError()
+    result=[]
+    for node in raw:
+        if not isinstance(node,dict) or set(node)-{'label','stop_at','done'}: raise ValueError()
+        label=node.get('label',''); moment=node.get('stop_at')
+        if not isinstance(label,str) or len(label)>80 or not isinstance(moment,str): raise ValueError()
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?:\+08:00)?',moment): raise ValueError()
+        dt.datetime.fromisoformat(moment)
+        done=node.get('done',False)
+        if type(done) is not bool: raise ValueError()
+        result.append(dict(label=label.strip(),stop_at=moment[:16]+'+08:00',done=done))
+    return sorted(result,key=lambda x:x['stop_at'])
 def connect():
     DB.parent.mkdir(parents=True,exist_ok=True)
     c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; c.execute('PRAGMA foreign_keys=ON'); return c
@@ -31,6 +44,10 @@ def init():
         for field in ('start_time','end_time'):
             if field not in [r['name'] for r in c.execute('PRAGMA table_info(tasks)')]:
                 c.execute(f"ALTER TABLE tasks ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
+        if 'milestones' not in [r['name'] for r in c.execute('PRAGMA table_info(tasks)')]:
+            c.execute("ALTER TABLE tasks ADD COLUMN milestones TEXT NOT NULL DEFAULT '[]'")
+        if 'short_title' not in [r['name'] for r in c.execute('PRAGMA table_info(tasks)')]:
+            c.execute("ALTER TABLE tasks ADD COLUMN short_title TEXT NOT NULL DEFAULT ''")
         if 'admin' not in [r['name'] for r in c.execute('PRAGMA table_info(users)')]:
             c.execute('ALTER TABLE users ADD COLUMN admin INTEGER NOT NULL DEFAULT 0')
             c.execute('UPDATE users SET admin=1 WHERE id=(SELECT min(id) FROM users)')
@@ -356,10 +373,15 @@ class Handler(BaseHTTPRequestHandler):
                         self.send(400,{'error':'结束时间必须晚于开始时间'});return
                 elif start_time!='' or end_time!='':raise ValueError()
                 if due: dt.datetime.fromisoformat(due)
+                existing=c.execute('SELECT milestones,short_title FROM tasks WHERE id=? AND user_id=?',(path.rsplit('/',1)[1],uid)).fetchone() if method=='PUT' else None
+                short_title=data.get('short_title',existing['short_title'] if existing else '')
+                if not isinstance(short_title,str) or len(short_title)>40: raise ValueError()
+                short_title=short_title.strip()
+                milestones=json.dumps(validate_milestones(data.get('milestones',json.loads(existing['milestones']) if existing else [])),ensure_ascii=False)
                 if not 1<=len(title)<=120 or len(notes)>4000 or not c.execute('SELECT 1 FROM categories WHERE user_id=? AND name=?',(uid,category)).fetchone() or len(due)>16: raise ValueError()
-                if method=='POST': c.execute('INSERT INTO tasks(id,user_id,title,category,date,due,notes,done,version,end_date,start_time,end_time) VALUES(?,?,?,?,?,?,?,?,1,?,?,?)',(secrets.token_hex(8),uid,title,category,date,due,notes,int(bool(data.get('done',False))),end_date,start_time,end_time))
+                if method=='POST': c.execute('INSERT INTO tasks(id,user_id,title,category,date,due,notes,done,version,end_date,start_time,end_time,milestones,short_title) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?)',(secrets.token_hex(8),uid,title,category,date,due,notes,int(bool(data.get('done',False))),end_date,start_time,end_time,milestones,short_title))
                 else:
-                    cur=c.execute('UPDATE tasks SET title=?,category=?,date=?,end_date=?,start_time=?,end_time=?,due=?,notes=?,done=?,version=version+1 WHERE id=? AND user_id=? AND version=?',(title,category,date,end_date,start_time,end_time,due,notes,int(bool(data.get('done',False))),path.rsplit('/',1)[1],uid,data['version']))
+                    cur=c.execute('UPDATE tasks SET title=?,category=?,date=?,end_date=?,start_time=?,end_time=?,due=?,notes=?,done=?,milestones=?,short_title=?,version=version+1 WHERE id=? AND user_id=? AND version=?',(title,category,date,end_date,start_time,end_time,due,notes,int(bool(data.get('done',False))),milestones,short_title,path.rsplit('/',1)[1],uid,data['version']))
                     if cur.rowcount==0: self.send(409,{'error':'任务已被其他页面修改，请刷新后重试'}); return
                 self.send(200,{'ok':True}); return
             if path.startswith('/api/tasks/') and method=='DELETE':
