@@ -39,7 +39,7 @@ class Frontend(unittest.TestCase):
             self.assertIn('href="/legacy/"', html)
             self.assertIn('/legacy/app.js', html)
         with urllib.request.urlopen(self.url + '/') as res:
-            self.assertIn('href="/next/"', res.read().decode())
+            self.assertEqual(res.read(), (app.ROOT / 'static/next/index.html').read_bytes())
 
     def test_legacy_snapshot_hashes(self):
         root = Path(__file__).resolve().parents[1] / 'static' / 'legacy'
