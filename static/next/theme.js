@@ -1,0 +1,2 @@
+/* Apply theme before any stylesheet or body is parsed; compatible with self-only CSP. */
+try{const saved=localStorage.getItem('semester-theme'),systemDark=typeof matchMedia==='function'&&matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.dataset.theme=saved==='dark'||saved==='light'?saved:systemDark?'dark':'light'}catch(e){document.documentElement.dataset.theme=typeof matchMedia==='function'&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}

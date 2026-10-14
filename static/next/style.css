@@ -56,3 +56,109 @@ a{color:inherit}.ui-icon{width:18px;height:18px;flex:none;vertical-align:middle}
 .next-ui #utility-dialog #logout-button{margin-top:12px;border-top:1px solid var(--line);border-radius:0;color:var(--muted)}
 .next-ui .next-sidebar #mobile-more{margin-top:auto;display:flex;align-items:center;gap:9px;border-top:1px solid var(--line);border-radius:0;padding-top:14px}
 @media(max-width:700px){.next-ui .next-sidebar #mobile-more{margin:0 0 0 auto;border:0;padding:6px 8px}.next-ui #utility-dialog{height:min(440px,calc(100dvh - 32px))}}
+/* A neutral calendar surface with local emphasis, in both themes. */
+.next-ui .week-grid .next-day.is-today{background:var(--surface);box-shadow:none!important}
+.next-ui .next-day.is-today .day-heading>span{color:var(--ink);background:var(--soft);padding:2px 6px;border-radius:4px}
+.next-ui .compact-course{background:transparent}
+.next-ui .compact-course .course-open,.next-ui .compact-course .course-open:hover{background:transparent;box-shadow:none;color:var(--ink);filter:none}
+.next-ui .journal-link,.next-ui .journal-link.has-note{background:transparent;color:var(--muted);border:0;box-shadow:none}
+.next-ui .task.done,.next-ui .range-bar.done{opacity:.82}
+.next-ui .task.done strong,.next-ui .range-bar.done strong{color:var(--muted)}
+/* Content switches read as tabs, with a baseline and active underline. */
+.next-ui .detail-tabs,.next-ui .account-tabs,.next-ui .day-tabs{background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0;gap:20px;margin-bottom:18px;box-shadow:none}
+.next-ui .detail-tabs button,.next-ui .account-tabs button,.next-ui .day-tabs button{flex:0 0 auto;border:0;border-bottom:2px solid transparent;border-radius:0;padding:9px 2px;margin:0;background:transparent;color:var(--muted);box-shadow:none;font-size:13px}
+.next-ui .detail-tabs button.active,.next-ui .account-tabs button.active,.next-ui .day-tabs button.active{background:transparent;color:var(--ink);border-bottom-color:#6f987d;box-shadow:none;font-weight:600}
+.next-ui .toolbar .view-switch{background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0;gap:18px;box-shadow:none}
+.next-ui .view-switch button{background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;padding:9px 2px;color:var(--muted)}
+.next-ui .view-switch button.active{background:transparent;color:var(--ink);border-bottom-color:#6f987d;box-shadow:none;font-weight:600}
+@media(max-width:700px){.next-ui .detail-tabs,.next-ui .account-tabs,.next-ui .day-tabs{gap:14px}.next-ui .detail-tabs button,.next-ui .account-tabs button,.next-ui .day-tabs button{font-size:12px;padding:8px 1px}.next-ui .toolbar .view-switch{gap:12px}.next-ui .view-switch button{padding:8px 2px}}
+.next-ui .toolbar .view-switch button.active{background:transparent;color:var(--ink);border-bottom-color:#6f987d;box-shadow:none}
+.next-ui #calendar .journal-link.has-note{background:transparent;color:var(--muted)}
+.next-ui .compact-course strong{color:var(--ink)}
+.next-ui .node-pin.completed{opacity:.8}
+/* The course edge and hover surface belong to one box. */
+.next-ui .compact-course{padding:0;border-radius:0 5px 5px 0;background:transparent}
+.next-ui .compact-course .course-open{height:100%;padding:5px 8px;margin:0;width:100%;background:transparent}
+.next-ui .compact-course:hover{background:var(--soft)}
+.next-ui .compact-course:not(:has(.course-open)){padding:5px 8px}
+.next-ui .compact-course:focus-within{outline:2px solid #6f987d;outline-offset:1px}
+.next-ui #sharing-dialog{height:min(670px,calc(100dvh - 32px));width:min(640px,calc(100vw - 24px));overflow:hidden}
+.next-ui #sharing-dialog[open]{display:flex;flex-direction:column}
+.next-ui #sharing-dialog>.dialog-head{flex-shrink:0}
+.next-ui #share-overview{flex:1;min-height:0;overflow:auto}
+.next-ui #share-overview>p{margin:0 0 18px;line-height:1.6}
+.next-ui #share-overview>h3{font-size:13px;margin:0 0 10px}
+.next-ui #my-shares .share-row{padding:10px 0;margin:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;gap:10px}
+.next-ui #my-shares .share-row strong{font-size:13px;font-weight:600}
+.next-ui #my-shares .share-row small{font-size:11px}
+.next-ui #my-shares .share-row button{font-size:12px;padding:5px 9px;background:transparent}
+.next-ui #share-admin{margin-top:22px}
+.next-ui #share-editor{display:flex;flex-direction:column;flex:1;min-height:0}
+.next-ui .share-editor-heading{display:flex;justify-content:space-between;gap:12px;flex-shrink:0}
+.next-ui .share-editor-heading button{border:0;background:transparent;padding:3px 0;font-size:11px;color:var(--muted)}
+.next-ui #share-policy-title{font-size:16px;margin:12px 0 8px;flex-shrink:0}
+.next-ui #share-editor>.detail-tabs{flex-shrink:0;margin-bottom:12px}
+.next-ui #share-policy{flex:1;min-height:0;overflow:auto;border:0;margin:0;padding:0 3px}
+.next-ui .share-panel>label{font-size:12px;margin:10px 0}
+.next-ui .share-panel p{font-size:11px;line-height:1.6}
+.next-ui .share-panel fieldset{padding:10px 12px;margin-bottom:14px;border-color:var(--line)!important}
+.next-ui .share-panel legend{font-size:12px}
+.next-ui #share-categories label{font-size:12px;margin:4px 10px 4px 0}
+.next-ui .share-editor-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.next-ui .share-editor-footer small{font-size:10px;color:var(--muted)}
+.next-ui .share-editor-footer button{font-size:12px;white-space:nowrap}
+.next-ui #sharing-error{font-size:11px;flex-shrink:0;margin:8px 0 0;min-height:16px}
+@media(max-width:700px){.next-ui .compact-course .course-open,.next-ui .compact-course:not(:has(.course-open)){padding-top:7px;padding-bottom:7px}.next-ui #sharing-dialog{height:calc(100dvh - 32px)}.next-ui #share-editor>.detail-tabs{gap:12px}.next-ui #share-editor>.detail-tabs button{font-size:11px}.next-ui .share-editor-footer{align-items:flex-start}.next-ui .share-editor-footer small{max-width:55%}}
+/* Scrollbar geometry is part of layout, even on a short tab. */
+html{scrollbar-gutter:stable}
+.next-ui dialog{scrollbar-gutter:stable;overscroll-behavior:contain}
+.next-ui #task-details,.next-ui #account-dialog,.next-ui #sharing-dialog,.next-ui #timetable-dialog{scrollbar-gutter:auto}
+.next-ui #task-details .task-parameters,.next-ui #account-form,.next-ui #share-overview,.next-ui #share-policy,.next-ui #course-body{scrollbar-gutter:stable;overscroll-behavior:contain}
+.next-ui #timetable-dialog[open]{display:flex;flex-direction:column;overflow:hidden}
+.next-ui #timetable-dialog>.dialog-head,.next-ui #timetable-dialog>p,.next-ui #timetable-dialog>.detail-tabs{flex-shrink:0}
+.next-ui #course-body{flex:1;min-height:0;overflow:auto;padding-right:2px}
+.next-ui .course-footer{height:58px;flex-shrink:0;border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.next-ui .course-footer button{font-size:12px}
+.next-ui .course-footer #course-error{margin:4px 0;font-size:11px}
+.context-panels{display:grid;grid-template-columns:minmax(230px,1fr) minmax(0,2fr);gap:12px;margin-bottom:20px}
+.context-panel{height:136px;display:flex;flex-direction:column;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:9px;min-width:0}
+.context-panel h2{font-size:12px;font-weight:500;margin:0 0 8px;color:var(--muted);display:flex;gap:12px;align-items:center;flex-shrink:0}
+.context-panel h2 small{font-size:10px;font-weight:400}
+.context-body{min-height:0;overflow:auto;scrollbar-gutter:stable;overscroll-behavior:contain}
+.course-hint{display:flex;gap:12px;align-items:center;margin:5px 0}
+.course-hint>span{font-size:10px;color:var(--muted);min-width:50px}
+.course-hint strong{font-size:12px;font-weight:500;display:block}
+.course-hint small{font-size:10px;color:var(--muted);display:block}
+.next-ui .task-hint{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,2fr);align-items:start;gap:12px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:6px 0;background:transparent}
+.task-hint strong{font-size:11px;font-weight:500;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.task-hint>span{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:10px;color:var(--ink)}
+.hint-point.past{color:var(--muted)}.hint-empty{font-size:11px;color:var(--muted);margin:8px 0}
+@media(max-width:700px){.context-panels{grid-template-columns:1fr;gap:8px;margin-bottom:14px}.context-panel{height:124px;padding:10px 12px}.context-panel h2{gap:8px;flex-wrap:wrap}.task-hint strong{font-size:11px}.next-ui .task-hint{gap:8px}}
+/* One rounded focus surface, without a second outline clipped by its container. */
+.next-ui input:not([type=checkbox]):not([type=range]):focus,.next-ui select:focus,.next-ui textarea:focus{outline:none;border-color:var(--accent,#538b70);box-shadow:0 0 0 2px var(--accent,#538b70)}
+.next-ui #task-dialog{width:660px;height:min(700px,calc(100dvh - 32px));overflow:hidden}
+.next-ui #task-form{height:100%;display:flex;flex-direction:column;min-height:0}
+.next-ui #task-form>.dialog-head,.next-ui #task-form>.detail-tabs,.next-ui #task-form>.dialog-actions{flex-shrink:0}
+.next-ui .task-editor-body{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;padding:4px 4px 12px}
+.next-ui #task-form>.dialog-actions{border-top:1px solid var(--line);padding-top:12px;margin-top:0}
+.next-ui .task-editor-body dd{white-space:pre-wrap;overflow-wrap:anywhere}
+.next-ui #accounts-dialog{width:660px;height:min(680px,calc(100dvh - 32px));overflow:auto;scrollbar-gutter:stable}
+.next-ui #viewer-admin input,.next-ui #viewer-admin select{box-sizing:border-box;max-width:100%}
+.next-ui #course-admin{border-top:1px solid var(--line);padding-top:12px}
+.next-ui #category-section{margin-top:16px}
+@media(max-width:700px){.next-ui #task-dialog,.next-ui #accounts-dialog{width:calc(100vw - 20px);height:calc(100dvh - 24px)}}
+.next-ui #utility-dialog .side-bottom>section{display:flex;flex-direction:column;gap:3px}
+.next-ui #utility-dialog .side-bottom>section>button{text-align:left;width:100%;border:0;background:transparent;padding:11px 13px}
+.next-ui #utility-dialog .side-bottom>section>button:hover{background:var(--soft)}
+.next-ui #category-dialog{height:min(620px,calc(100dvh - 32px));overflow:auto;scrollbar-gutter:stable}
+.next-ui .day-overview{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:24px}
+.next-ui .day-overview h3{font-size:12px;color:var(--muted);font-weight:500;margin:0 0 12px}
+.next-ui .day-overview .agenda-item{padding:5px 0}
+@media(max-width:700px){.next-ui .day-overview{grid-template-columns:1fr;gap:20px}}
+.next-ui .daily-reminders{border-left:3px solid #b68a4a;background:var(--soft);padding:10px 12px;margin-bottom:14px;border-radius:5px}
+.next-ui .daily-reminders h3{font-size:12px;margin:0 0 6px}.next-ui .daily-reminders h3 span{font-size:10px;color:var(--muted);font-weight:400;padding-left:8px}
+.next-ui .daily-reminders>div{max-height:96px;overflow:auto;scrollbar-gutter:stable}
+.next-ui .daily-reminders button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;text-align:left;padding:5px 2px;font-size:12px}
+.next-ui .daily-reminders strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;flex:1}
+.next-ui .daily-reminders small{font-size:10px;color:var(--muted);white-space:nowrap}.next-ui .daily-reminders .overdue>span{color:#be6154}
+html[data-theme=dark] .next-ui .daily-reminders .overdue>span{color:#f2a398}

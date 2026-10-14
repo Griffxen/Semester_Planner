@@ -29,6 +29,9 @@ class Frontend(unittest.TestCase):
                             ('/legacy/style.css', 'text/css'),
                             ('/next/app.js', 'text/javascript'),
                             ('/next/icons.js', 'text/javascript'),
+                            ('/next/hints.js', 'text/javascript'),
+                            ('/next/theme.js', 'text/javascript'),
+                            ('/next/paint.css', 'text/css'),
                             ('/next/style.css', 'text/css')]:
             with self.subTest(route=route), urllib.request.urlopen(self.url + route) as res:
                 self.assertEqual(res.status, 200)
@@ -40,6 +43,12 @@ class Frontend(unittest.TestCase):
             self.assertIn('/legacy/app.js', html)
         with urllib.request.urlopen(self.url + '/') as res:
             self.assertEqual(res.read(), (app.ROOT / 'static/next/index.html').read_bytes())
+
+    def test_theme_bootstrap_is_csp_compatible_and_precedes_styles(self):
+        html = (app.ROOT / 'static/next/index.html').read_text()
+        self.assertNotIn('<script>', html)
+        self.assertLess(html.index('/next/theme.js'), html.index('/legacy/style.css'))
+        self.assertLess(html.index('/next/paint.css'), html.index('/legacy/style.css'))
 
     def test_legacy_snapshot_hashes(self):
         root = Path(__file__).resolve().parents[1] / 'static' / 'legacy'

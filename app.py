@@ -104,7 +104,7 @@ class Handler(BaseHTTPRequestHandler):
                 '/legacy':'legacy/index.html', '/legacy/':'legacy/index.html'}
         for prefix,names in [('',('app.js','style.css','icon.svg','share.js')),
                              ('legacy/',('app.js','style.css','icon.svg','share.js','transition.css')),
-                             ('next/',('app.js','style.css','icons.js'))]:
+                             ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css'))]:
             assets.update({'/'+prefix+name:prefix+name for name in names})
         if method=='GET' and path in assets:
             f=ROOT/'static'/assets[path]

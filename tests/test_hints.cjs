@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ctx={};vm.createContext(ctx);vm.runInContext(fs.readFileSync('static/next/hints.js','utf8'),ctx);
+const now=Date.parse('2026-10-14T12:00+08:00');
+const task={id:'a',date:'2026-10-14',end_date:'2026-10-14',start_time:'10:00',end_time:'14:00',due:'2026-10-14T16:00',milestones:[{label:'检查',stop_at:'2026-10-14T13:00+08:00',done:true}]};
+const result=ctx.taskTimeHints([task,{...task,id:'b',date:'2026-10-20',end_date:'2026-10-20',due:'',milestones:[]}],now);
+assert.equal(result.length,1);assert.equal(result[0].points.length,4);assert.equal(result[0].points[1].done,true);
+assert.equal(ctx.taskTimeHints([{...task,start_time:'00:00',end_time:'23:59',due:'',milestones:[]}],now)[0].points.length,2);
+const courses=[{name:'当前',date:'2026-10-14',time:'11:00–13:00'},{name:'之后',date:'2026-10-14',time:'14:00–16:00'},{name:'已取消',date:'2026-10-14',time:'12:30–13:30',cancelled:true}];
+const hint=ctx.courseTimeHints(courses,now);assert.equal(hint.current.length,1);assert.equal(hint.next.course.name,'之后');assert.equal(ctx.courseTimeHints([],now).next,null);
+assert.equal(ctx.courseTimeHints(courses,Date.parse('2026-10-14T13:00+08:00')).current.length,0);
+console.log('Time hint grouping, boundaries, completed milestones and course selection passed');
