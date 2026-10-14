@@ -33,3 +33,26 @@ a{color:inherit}.ui-icon{width:18px;height:18px;flex:none;vertical-align:middle}
 .next-ui .legacy-link:hover{background:transparent;text-decoration:underline;color:var(--ink)}
 .next-ui .legacy-link span{font-size:10px}
 @media(max-width:700px){.next-ui .legacy-link{margin:0;padding:3px 5px;font-size:10px}}
+/* Equal, compact two-line rhythm; full arrangements remain visible. */
+.next-ui .task{height:44px;min-height:44px;padding:5px 8px;margin:4px 0;gap:6px}
+.next-ui .task strong{font-size:12px;line-height:17px}
+.next-ui .task .task-meta{font-size:10px;line-height:15px}
+.next-ui .range-bar{height:44px;min-height:44px;max-height:44px;padding:4px 8px!important}
+.next-ui .range-top{height:16px}
+.next-ui .range-top strong{line-height:16px}
+.next-ui .node-rail{height:17px;margin-top:1px}
+.next-ui .node-pin{height:16px}
+.next-ui .compact-course{height:44px;min-height:44px;padding:5px 8px;margin:4px 0;overflow:hidden;border-left:2px solid var(--line)}
+.next-ui .compact-course .course-open{height:32px;padding:0;margin:0;width:100%;border-radius:0;display:block;font-size:12px}
+.next-ui .compact-course strong{display:block;font-size:12px;line-height:17px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.next-ui .compact-course small{display:block;font-size:10px;line-height:15px;margin:0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:700px){.next-ui .task,.next-ui .range-bar,.next-ui .compact-course{height:48px;min-height:48px;max-height:48px}.next-ui .task,.next-ui .compact-course{padding-top:7px;padding-bottom:7px}.next-ui .range-bar{padding-top:6px!important;padding-bottom:6px!important}}
+.next-ui #utility-dialog{height:min(440px,calc(100dvh - 32px));width:min(440px,calc(100vw - 24px));overflow:auto}
+.next-ui #utility-dialog .side-bottom{display:block;margin:0;padding:0;border:0}
+.next-ui #utility-dialog details{padding:0;border:0}
+.next-ui #utility-dialog details>summary{display:none}
+.next-ui #utility-dialog .side-bottom button{display:flex;align-items:center;gap:10px;width:100%;margin:3px 0;padding:10px 12px;border:0;border-radius:7px;background:transparent;box-shadow:none;text-align:left;font-size:13px}
+.next-ui #utility-dialog .side-bottom button:hover{background:var(--soft)}
+.next-ui #utility-dialog #logout-button{margin-top:12px;border-top:1px solid var(--line);border-radius:0;color:var(--muted)}
+.next-ui .next-sidebar #mobile-more{margin-top:auto;display:flex;align-items:center;gap:9px;border-top:1px solid var(--line);border-radius:0;padding-top:14px}
+@media(max-width:700px){.next-ui .next-sidebar #mobile-more{margin:0 0 0 auto;border:0;padding:6px 8px}.next-ui #utility-dialog{height:min(440px,calc(100dvh - 32px))}}
