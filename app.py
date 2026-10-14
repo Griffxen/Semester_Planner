@@ -100,8 +100,17 @@ class Handler(BaseHTTPRequestHandler):
         path=self.path.split('?')[0]
         if path in ('/api/v1/agenda','/api/v1/agenda/meta') and method!='GET':
             self.send(405,{'error':'只支持读取'}); return
-        if method=='GET' and path in ('/','/app.js','/style.css','/icon.svg','/share.js'):
-            f=ROOT/'static'/({'/':'index.html'}.get(path,path[1:])); self.send(200,f.read_bytes(),{'/':'text/html; charset=utf-8','/app.js':'text/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8','/icon.svg':'image/svg+xml','/share.js':'text/javascript; charset=utf-8'}[path]); return
+        assets={'/':'index.html', '/next':'next/index.html', '/next/':'next/index.html',
+                '/legacy':'legacy/index.html', '/legacy/':'legacy/index.html'}
+        for prefix,names in [('',('app.js','style.css','icon.svg','share.js')),
+                             ('legacy/',('app.js','style.css','icon.svg','share.js','transition.css')),
+                             ('next/',('app.js','style.css','icons.js'))]:
+            assets.update({'/'+prefix+name:prefix+name for name in names})
+        if method=='GET' and path in assets:
+            f=ROOT/'static'/assets[path]
+            ctype={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',
+                   '.css':'text/css; charset=utf-8','.svg':'image/svg+xml'}[f.suffix]
+            self.send(200,f.read_bytes(),ctype); return
         data={}
         if method!='GET':
             if self.headers.get('Content-Type','').split(';')[0]!='application/json': self.send(415,{'error':'需要 JSON 请求'}); return
