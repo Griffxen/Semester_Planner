@@ -1,5 +1,6 @@
 """Small read-only projection for a dashboard bound to a viewer account."""
 import datetime as dt
+import hashlib
 from urllib.parse import parse_qs, urlsplit
 
 from sharing import shared_state
@@ -32,13 +33,14 @@ def agenda(c, viewer, raw_path):
     tasks = []
     if 'tasks' in include:
         for task in visible['tasks']:
-            if task['date'] > hi or task['end_date'] < lo:
-                continue
+            milestones = [{**m, 'display_name': (task.get('short_title') or task['title']) + ' · ' + (m['label'] or '关键节点'),
+                           'end_date': m['stop_at'][:10], 'end_time': m['stop_at'][11:16]}
+                          for m in task.get('milestones', []) if lo <= m['stop_at'][:10] <= hi]
+            overlaps = task['date'] <= hi and task['end_date'] >= lo
             item = {k: task.get(k) for k in ('id', 'title', 'category', 'date', 'end_date',
                                               'start_time', 'end_time', 'done', 'notes', 'short_title')}
             item['due'] = task.get('due') or None
-            item['milestones'] = [{**m, 'display_name': (task.get('short_title') or task['title']) + ' · ' + (m['label'] or '关键节点')}
-                                  for m in task.get('milestones', []) if lo <= m['stop_at'][:10] <= hi]
+            item['milestones'] = milestones
             item['continues_before'] = task['date'] < lo or task.get('continues_before', False)
             item['continues_after'] = task['end_date'] > hi or task.get('continues_after', False)
             item['date'] = max(lo, task['date'])
@@ -47,7 +49,21 @@ def agenda(c, viewer, raw_path):
                 item['start_time'] = '00:00'
             if item['start_time'] and task['end_date'] > hi:
                 item['end_time'] = '23:59'
-            tasks.append(item)
+            if overlaps:
+                tasks.append(item)
+            # Old consumers read only tasks and end_date/end_time. Project
+            # each checkpoint as an end-only event. Do not invent a start: old
+            # consumers otherwise select that start and label the event incorrectly.
+            duplicates = {}
+            for m in milestones:
+                key = hashlib.sha256((m['label'] + '\0' + m['stop_at']).encode()).hexdigest()[:16]
+                duplicates[key] = duplicates.get(key, 0) + 1
+                tasks.append(dict(id=f"{task['id']}:milestone:{key}:{duplicates[key]}",
+                                  title=m['display_name'], short_title=task.get('short_title', ''),
+                                  category=task['category'], end_date=m['end_date'], end_time=m['end_time'],
+                                  done=m.get('done', False), notes='',
+                                  milestones=[], kind='milestone', parent_task_id=task['id'],
+                                  continues_before=False, continues_after=False))
     courses = [course for course in visible['course_dates'] if lo <= course['date'] <= hi] if 'courses' in include else []
     date_counts = [count for count in visible['date_counts'] if lo <= count['date'] <= hi] if 'tasks' in include else []
     return dict(timezone=TIMEZONE,

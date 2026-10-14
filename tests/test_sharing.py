@@ -36,16 +36,30 @@ class Sharing(unittest.TestCase):
         status,result=self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)
         self.assertEqual(status,200);task=result['tasks'][0]
         self.assertEqual(task['short_title'],'简称');self.assertEqual(len(task['milestones']),2)
-        self.assertEqual(task['milestones'][0],dict(label='初稿',display_name='简称 · 初稿',stop_at='2026-09-16T18:00+08:00',done=True))
+        self.assertEqual(task['milestones'][0],dict(label='初稿',display_name='简称 · 初稿',stop_at='2026-09-16T18:00+08:00',done=True,end_date='2026-09-16',end_time='18:00'))
         self.assertNotIn('SECRET',json.dumps(result))
+        events=[t for t in result['tasks'] if t.get('kind')=='milestone']
+        self.assertEqual(len(events),2)
+        self.assertEqual(events[0]['title'],'简称 · 初稿');self.assertTrue(events[0]['done'])
+        self.assertEqual(events[1]['title'],'简称 · 提交');self.assertFalse(events[1]['done'])
+        self.assertNotIn('date',events[1]);self.assertEqual(events[1]['end_date'],'2026-09-19')
+        self.assertNotIn('start_time',events[1]);self.assertEqual(events[1]['end_time'],'23:59')
+        self.assertNotIn('due',events[1]);self.assertEqual(events[1]['parent_task_id'],task['id'])
+        event_id=events[0]['id']
+        single=self.dashboard('agenda?from=2026-09-16&to=2026-09-16',token)[1]
+        self.assertEqual([t['id'] for t in single['tasks'] if t.get('kind')=='milestone'],[event_id])
+        self.assertEqual(self.dashboard('agenda?from=2026-09-15&to=2026-09-20&include=courses',token)[1]['tasks'],[])
         narrowed=self.dashboard('agenda?from=2026-09-16&to=2026-09-16',token)[1]['tasks'][0]
         self.assertEqual(len(narrowed['milestones']),1)
         own=self.req('state')[1]['tasks'][0]
         self.assertEqual(self.req('tasks/'+own['id'],'PUT',{**own,'short_title':''})[0],200)
         fallback=self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)[1]['tasks'][0]['milestones'][0]
         self.assertEqual(fallback['display_name'],'完整的主任务名称 · 初稿')
+        fallback_events=self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)[1]['tasks']
+        self.assertEqual(next(t for t in fallback_events if t.get('kind')=='milestone')['title'],'完整的主任务名称 · 初稿')
         self.policy(busy_only=True)
         busy=self.dashboard('agenda?from=2026-09-15&to=2026-09-20',token)[1]
+        self.assertFalse(any(t.get('kind')=='milestone' for t in busy['tasks']))
         for task in busy['tasks']:
             self.assertEqual(task['milestones'],[]);self.assertEqual(task['short_title'],'')
         for secret in ['初稿','提交','完整的主任务名称','简称']:self.assertNotIn(secret,json.dumps(busy,ensure_ascii=False))
