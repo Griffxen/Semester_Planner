@@ -57,8 +57,8 @@ a{color:inherit}.ui-icon{width:18px;height:18px;flex:none;vertical-align:middle}
 .next-ui .next-sidebar #mobile-more{margin-top:auto;display:flex;align-items:center;gap:9px;border-top:1px solid var(--line);border-radius:0;padding-top:14px}
 @media(max-width:700px){.next-ui .next-sidebar #mobile-more{margin:0 0 0 auto;border:0;padding:6px 8px}.next-ui #utility-dialog{height:min(440px,calc(100dvh - 32px))}}
 /* A neutral calendar surface with local emphasis, in both themes. */
-.next-ui .week-grid .next-day.is-today{background:var(--surface);box-shadow:none!important}
-.next-ui .next-day.is-today .day-heading>span{color:var(--ink);background:var(--soft);padding:2px 6px;border-radius:4px}
+.next-ui .next-day.is-today{background:var(--soft);box-shadow:none!important}
+.next-ui .next-day.is-today .day-heading-actions>span{color:var(--ink)}
 .next-ui .compact-course{background:transparent}
 .next-ui .compact-course .course-open,.next-ui .compact-course .course-open:hover{background:transparent;box-shadow:none;color:var(--ink);filter:none}
 .next-ui .journal-link,.next-ui .journal-link.has-note{background:transparent;color:var(--muted);border:0;box-shadow:none}
@@ -171,8 +171,6 @@ html[data-theme=dark] .next-ui .daily-reminders .overdue>span{color:#f2a398}
 
 /* Date-local creation remains visible without adding another row to each day. */
 .day-heading-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.next-ui .day-add{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;min-width:26px;padding:0;border:1px solid #b9d2c1;border-radius:6px;background:#e1eee5;color:#315d4b;font-size:20px;line-height:1;flex-shrink:0}
-.next-ui .day-add:hover{background:#cfe3d6;border-color:#7fa58e}
+.next-ui .day-add{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;min-width:26px;padding:0;border:0;border-radius:4px;background:transparent;color:var(--muted);font-size:20px;line-height:1;flex-shrink:0}
+.next-ui .day-add:hover{background:transparent;color:var(--ink)}
 .next-ui .day-add:focus-visible{outline:2px solid var(--green);outline-offset:2px}
-html[data-theme=dark] .next-ui .day-add{background:#355744;border-color:#52795f;color:#e1f2e6}
-html[data-theme=dark] .next-ui .day-add:hover{background:#416b52;border-color:#7cb08d}
