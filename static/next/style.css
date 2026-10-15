@@ -168,3 +168,11 @@ html[data-theme=dark] .next-ui .daily-reminders .overdue>span{color:#f2a398}
 .next-ui #category-dialog [data-move-category]{grid-column:1/-1;justify-self:end;color:var(--muted)}
 /* The old disclosure selector must not hide categories after its wrapper became a section. */
 @media(max-width:700px){.next-ui #category-section{width:100%;margin:4px 0}.next-ui #category-section #categories{display:flex;flex-wrap:wrap;gap:4px}}
+
+/* Date-local creation remains visible without adding another row to each day. */
+.day-heading-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.next-ui .day-add{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;min-width:26px;padding:0;border:1px solid #b9d2c1;border-radius:6px;background:#e1eee5;color:#315d4b;font-size:20px;line-height:1;flex-shrink:0}
+.next-ui .day-add:hover{background:#cfe3d6;border-color:#7fa58e}
+.next-ui .day-add:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+html[data-theme=dark] .next-ui .day-add{background:#355744;border-color:#52795f;color:#e1f2e6}
+html[data-theme=dark] .next-ui .day-add:hover{background:#416b52;border-color:#7cb08d}
