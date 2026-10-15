@@ -162,3 +162,9 @@ html{scrollbar-gutter:stable}
 .next-ui .daily-reminders strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;flex:1}
 .next-ui .daily-reminders small{font-size:10px;color:var(--muted);white-space:nowrap}.next-ui .daily-reminders .overdue>span{color:#be6154}
 html[data-theme=dark] .next-ui .daily-reminders .overdue>span{color:#f2a398}
+.next-ui #category-move-dialog{width:440px;max-width:calc(100vw - 24px)}
+.next-ui #category-rows [data-move-category]{font-size:11px;white-space:nowrap;padding:6px 8px}
+@media(prefers-reduced-motion:reduce){.next-ui,.next-ui *{scroll-behavior:auto!important;transition:none!important}}
+.next-ui #category-dialog [data-move-category]{grid-column:1/-1;justify-self:end;color:var(--muted)}
+/* The old disclosure selector must not hide categories after its wrapper became a section. */
+@media(max-width:700px){.next-ui #category-section{width:100%;margin:4px 0}.next-ui #category-section #categories{display:flex;flex-wrap:wrap;gap:4px}}
