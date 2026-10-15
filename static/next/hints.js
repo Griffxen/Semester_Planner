@@ -5,8 +5,8 @@ function taskTimeHints(tasks, now) {
     const points = [];
     const addPoint = (kind, label, at, done, dateOnly = false) => {
       const ms = Date.parse(/(?:Z|[+-]\d{2}:\d{2})$/.test(at) ? at : at + '+08:00');
-      // Unfinished past points have no lower time limit; completed points disappear.
-      if (!done && Number.isFinite(ms) && ms <= high) points.push({kind, label, at, ms, done: false, dateOnly});
+      // Past starts are history, not unfinished work. End/due/milestone points remain until complete.
+      if (!done && Number.isFinite(ms) && ms <= high && (kind !== 'start' || ms >= now)) points.push({kind, label, at, ms, done: false, dateOnly});
     };
     addPoint('start', '开始', task.date + 'T' + (task.start_time || '00:00'), false, !task.start_time);
     addPoint('end', '结束', task.end_date + 'T' + (task.end_time || '23:59'), false, !task.end_time);
