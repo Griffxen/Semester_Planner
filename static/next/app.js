@@ -53,8 +53,20 @@ let mobileDate=today();const oldCalendarClick=$('#calendar').onclick;$('#calenda
 $('#mobile-more').onclick=()=>{const aside=document.querySelector('aside'),open=aside.classList.toggle('more-open');$('#mobile-more').setAttribute('aria-expanded',String(open))};
 // Detail tabs expose full information without making cards taller.
 const oldTaskDetails=showTaskDetails;showTaskDetails=function(id){oldTaskDetails(id);const dialog=$('#task-details'),t=state.tasks.find(x=>x.id===id);if(!dialog||!t)return;const dl=dialog.querySelector('dl');const summary=document.createElement('p');summary.className='task-scope-note';summary.textContent=t.category+' · '+(t.done?'已完成':'待完成')+' · '+taskWhen(t,true);dl.before(summary);const tabs=document.createElement('div');tabs.className='detail-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','任务详情');tabs.innerHTML=[['overview','概览'],['nodes','节点 · '+(t.milestones||[]).length],['notes','备注']].map(([id,label])=>`<button role="tab" data-detail-tab="${id}">${label}</button>`).join('');dl.before(tabs);const pairs=[...dl.querySelectorAll('dt')].map(dt=>({dt,dd:dt.nextElementSibling,label:dt.textContent}));function select(tab){pairs.forEach(({dt,dd,label})=>{const shown=tab==='nodes'?label==='关键节点':tab==='notes'?label==='备注':!['关键节点','备注'].includes(label);dt.hidden=dd.hidden=!shown});tabs.querySelectorAll('button').forEach(b=>{const active=b.dataset.detailTab===tab;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active))})}tabs.onclick=e=>{const b=e.target.closest('button');if(b)select(b.dataset.detailTab)};select('overview');};
-// Keep critical confirmation in place, with a quiet fallback and visible context.
-askConfirm=async function(message,label='确认操作'){const modal=[...document.querySelectorAll('dialog[open]')].at(-1),note=document.createElement('p');if(!lastActionButton?.getClientRects().length||(modal&&!modal.contains(lastActionButton)))lastActionButton=[...(modal||document).querySelectorAll('button')].find(b=>b.matches('.primary')&&b.getClientRects().length)||[...(modal||document).querySelectorAll('button')].find(b=>b.getClientRects().length);note.className='confirm-description';note.setAttribute('role','status');note.textContent=message+' · 向右滑动确认，Esc 取消';if(modal)modal.append(note);else $('#save-status').after(note);try{const result=legacyConfirm(message,label);document.querySelectorAll('.confirm-in-place-label').forEach(el=>el.textContent='滑动确认');return await result}finally{note.remove()}};
+// Keep confirmation context outside the layout while retaining the original slider.
+askConfirm=async function(message,label='确认操作'){
+  if(confirmationPending)return false;
+  const modal=[...document.querySelectorAll('dialog[open]')].at(-1),host=modal||document.body;
+  if(!lastActionButton?.getClientRects().length||(modal&&!modal.contains(lastActionButton)))lastActionButton=[...(modal||document).querySelectorAll('button')].find(b=>b.matches('.primary')&&b.getClientRects().length)||[...(modal||document).querySelectorAll('button')].find(b=>b.getClientRects().length);
+  const bar=document.createElement('div');bar.className='confirm-context-bar';bar.setAttribute('role','status');
+  const text=document.createElement('span');text.className='confirm-context-text';text.textContent=message;text.title=message+' · 向右滑动确认，Esc 取消';bar.append(text);host.append(bar);
+  try{
+    const result=legacyConfirm(message,label),direct=host.querySelector(':scope > .direct-confirm-corner');
+    if(direct)bar.append(direct);
+    document.querySelectorAll('.confirm-in-place-label').forEach(el=>el.textContent='滑动确认');
+    return await result;
+  }finally{bar.remove()}
+};
 // Track actual edits rather than asking for confirmation after a read-only visit.
 const oldCategoryOpen=$('#manage-categories').onclick;function categorySnapshot(){return JSON.stringify([...$('#category-dialog').querySelectorAll('input,select')].map(el=>[el.name,el.type==='checkbox'?el.checked:el.value]))}
 $('#manage-categories').onclick=()=>{oldCategoryOpen();categoryBaseline=categorySnapshot()};const oldCategoryRows=categoryRows;categoryRows=function(){oldCategoryRows();prepareCategoryActions();const form=$('#category-form'),draft=Object.fromEntries([...form.elements].filter(el=>el.name).map(el=>[el.name,el.value]));form.reset();categoryBaseline=categorySnapshot();for(const [key,value] of Object.entries(draft))form.elements[key].value=value};$('#category-close').onclick=async()=>{if(categoryBusy)return;if(categorySnapshot()!==categoryBaseline){lastActionButton=$('#category-close');if(!await askConfirm('放弃未保存的分类修改？'))return}$('#category-form').reset();$('#category-dialog').close()};
@@ -334,3 +346,12 @@ const taskDetailsBeforeNodeEditor=showTaskDetails;showTaskDetails=function(id){
 };
 
 $('#calendar').addEventListener('click',event=>{const button=event.target.closest('[data-open-node]');if(!button)return;event.stopImmediatePropagation();openTask(null,button.dataset.task);$('#task-details[open] [data-detail-tab="nodes"]')?.click()},true);
+// Keep native date fields to four-digit years, including dynamically added fields.
+function limitDateYear(input){
+  if(!(input instanceof HTMLInputElement)||!['date','datetime-local'].includes(input.type))return;
+  const maximum=input.type==='date'?'9999-12-31':'9999-12-31T23:59';
+  if(!input.max||input.max>maximum)input.max=maximum;
+}
+document.querySelectorAll('input').forEach(limitDateYear);
+document.addEventListener('focusin',event=>limitDateYear(event.target));
+new MutationObserver(records=>{for(const record of records){if(record.type==='attributes')limitDateYear(record.target);for(const node of record.addedNodes){if(node.nodeType!==1)continue;limitDateYear(node);node.querySelectorAll('input').forEach(limitDateYear)}}}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['type']});
