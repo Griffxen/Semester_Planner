@@ -291,3 +291,43 @@ const taskDetailsBeforeCopy=showTaskDetails;showTaskDetails=function(id){
   const button=document.createElement('button');button.type='button';button.textContent='复制任务';button.dataset.copyTask=id;button.onclick=()=>copyTask(id);
   actions.querySelector('[data-edit]').after(button);
 };
+
+// Node details stay readable; add and edit use a dedicated child dialog.
+function openNodeEditor(task,index=null){
+  if(state.readonly||busy||confirmationPending)return;
+  if(index===null&&(task.milestones||[]).length>=50){toast('每个任务最多添加 50 个节点');return}
+  let dialog=$('#node-editor-dialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='node-editor-dialog';document.body.append(dialog)}
+  const node=index===null?{}:task.milestones[index];
+  dialog.innerHTML=`<form><div class="dialog-head"><h2>${index===null?'添加节点':'编辑节点'}</h2><button type="button" data-close aria-label="返回节点列表">×</button></div><div class="node-editor-body"><p>${esc(task.title)}</p><label>节点名称<input name="label" maxlength="80" value="${esc(node.label||'')}" placeholder="如：初稿完成"></label><label>节点时间（北京时间）<input name="stop_at" type="datetime-local" required value="${esc((node.stop_at||'').slice(0,16))}"></label><label class="check"><input name="done" type="checkbox" ${node.done?'checked':''}>已完成</label><p data-error role="alert"></p></div><div class="node-editor-actions"><button type="button" class="soft-danger" data-delete ${index===null?'disabled':''}>删除节点</button><button type="submit" class="primary">保存节点</button></div></form>`;
+  const form=dialog.querySelector('form'),read=()=>({label:form.elements.label.value,stop_at:form.elements.stop_at.value,done:form.elements.done.checked});let original=JSON.stringify(read());
+  const close=async()=>{if(busy||confirmationPending)return;if(JSON.stringify(read())!==original&&!await askConfirm('放弃未保存的节点修改？'))return;dialog.close()};
+  dialog.querySelector('[data-close]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close()};
+  async function save(removing=false){
+    if(busy||confirmationPending)return;const error=form.querySelector('[data-error]');error.textContent='';
+    lastActionButton=form.querySelector(removing?'[data-delete]':'[type=submit]');
+    if(!await askConfirm(removing?'删除这个节点？':'保存这个节点？'))return;
+    const milestones=(task.milestones||[]).map(m=>({...m}));
+    if(removing)milestones.splice(index,1);else if(index===null)milestones.push(read());else milestones[index]=read();
+    try{if(await mutation(()=>api('tasks/'+task.id,'PUT',{...task,milestones}))){original=JSON.stringify(read());dialog.close();toast(removing?'节点已删除':'节点已保存')}}catch(err){error.textContent=err.message}
+  }
+  form.onsubmit=e=>{e.preventDefault();save()};form.querySelector('[data-delete]').onclick=()=>save(true);
+  dialog.showModal();form.elements.label.focus();
+}
+const taskDetailsBeforeNodeEditor=showTaskDetails;showTaskDetails=function(id){
+  taskDetailsBeforeNodeEditor(id);if(state.readonly)return;
+  const task=state.tasks.find(t=>t.id===id),dialog=$('#task-details');if(!task||!dialog)return;
+  const label=[...dialog.querySelectorAll('dt')].find(el=>el.textContent==='关键节点'),field=label?.nextElementSibling;if(!field)return;
+  label.classList.add('node-field-label');field.classList.add('task-node-field');
+  field.innerHTML=`<div class="detail-node-list">${(task.milestones||[]).map((node,index)=>`<div class="detail-node-item"><div><strong>${esc(node.label||'关键节点')}</strong><small>${esc(milestoneTime(node))} · ${node.done?'已完成':'未完成'}</small></div><div class="detail-node-actions"><button type="button" data-toggle-node="${index}">${node.done?'标为未完成':'标为完成'}</button><button type="button" data-edit-node="${index}">编辑</button></div></div>`).join('')||'<p class="hint-empty">暂未设置节点。</p>'}</div><button type="button" data-add-node>＋ 添加节点</button>`;
+  field.querySelector('[data-add-node]').onclick=()=>openNodeEditor(task);
+  field.querySelectorAll('[data-edit-node]').forEach(button=>button.onclick=()=>openNodeEditor(task,Number(button.dataset.editNode)));
+  field.querySelectorAll('[data-toggle-node]').forEach(button=>button.onclick=async()=>{
+    if(busy||confirmationPending)return;
+    const index=Number(button.dataset.toggleNode),node=task.milestones[index],error=dialog.querySelector('[data-error]');lastActionButton=button;
+    if(!await askConfirm('将「'+(node.label||'关键节点')+'」标为'+(node.done?'未完成':'完成')+'？'))return;
+    const milestones=task.milestones.map((m,i)=>i===index?{...m,done:!m.done}:m);button.disabled=true;error.textContent='';
+    try{if(await mutation(()=>api('tasks/'+id,'PUT',{...task,milestones}))){showTaskDetails(id);dialog.querySelector('[data-detail-tab="nodes"]').click()}}catch(err){error.textContent=err.message}finally{button.disabled=false}
+  });
+
+};
+
