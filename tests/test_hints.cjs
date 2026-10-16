@@ -22,3 +22,9 @@ const courses=[{name:'当前',date:'2026-10-14',time:'11:00–13:00'},{name:'之
 const hint=ctx.courseTimeHints(courses,now);assert.equal(hint.current.length,1);assert.equal(hint.next.course.name,'之后');assert.equal(ctx.courseTimeHints([],now).next,null);
 assert.equal(ctx.courseTimeHints(courses,Date.parse('2026-10-14T13:00+08:00')).current.length,0);
 console.log('Past unfinished + future 12h, completed exclusion, grouping and course selection passed');
+
+const nodeTasks=[{id:'long',date:'2026-10-01',end_date:'2026-10-10',milestones:[{label:'计划外节点',stop_at:'2026-10-16T10:00+08:00',done:false},{label:'已完成节点',stop_at:'2026-10-16T09:00+08:00',done:true}]},{id:'short',date:'2026-10-16',end_date:'2026-10-16',milestones:[{label:'短任务节点',stop_at:'2026-10-16T11:00+08:00',done:false}]}];
+assert.deepEqual(Array.from(ctx.calendarMilestones(nodeTasks,'2026-10-16'),x=>x.node.label),['已完成节点','计划外节点','短任务节点']);
+assert.equal(ctx.calendarMilestones(nodeTasks,'2026-10-16',true).length,2,'Hide completed nodes without losing other dates');
+assert.equal(ctx.calendarMilestones(nodeTasks,'2026-10-15').length,0,'No node entry on other dates');
+assert.equal(nodeTasks[0].milestones.length,2,'Projection preserves original nodes');

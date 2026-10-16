@@ -17,3 +17,9 @@ function taskTimeHints(tasks, now) {
   }).filter(x => x.points.length).sort((a, b) => a.nearest - b.nearest || String(a.task.id).localeCompare(String(b.task.id)));
 }
 function courseTimeHints(courses,now){const rows=courses.filter(c=>!c.cancelled).map(course=>{const times=course.time.match(/\d{2}:\d{2}/g)||[];return {course,start:Date.parse(course.date+'T'+times[0]+'+08:00'),end:Date.parse(course.date+'T'+times[1]+'+08:00')}}).filter(x=>Number.isFinite(x.start)&&Number.isFinite(x.end));return {current:rows.filter(x=>x.start<=now&&now<x.end).sort((a,b)=>a.end-b.end),next:rows.filter(x=>x.start>now).sort((a,b)=>a.start-b.start)[0]||null}}
+
+// Calendar entries belong to node dates, independent of the parent task range.
+function calendarMilestones(tasks,date,hideDone=false){
+  return tasks.flatMap(task=>(task.milestones||[]).filter(node=>node.stop_at.slice(0,10)===date&&(!hideDone||!node.done)).map(node=>({task,node})))
+    .sort((a,b)=>a.node.stop_at.localeCompare(b.node.stop_at)||String(a.task.id).localeCompare(String(b.task.id)));
+}
