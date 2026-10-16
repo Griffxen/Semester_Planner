@@ -33,6 +33,7 @@ def init():
         c.execute('CREATE TABLE IF NOT EXISTS holidays(id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL)')
         c.execute("INSERT OR IGNORE INTO holidays VALUES(1,'[]')")
         c.execute('CREATE TABLE IF NOT EXISTS user_course_exceptions(user_id INTEGER PRIMARY KEY, data TEXT NOT NULL)')
+        c.execute('CREATE TABLE IF NOT EXISTS course_annotations(user_id INTEGER, course_key TEXT, date TEXT, notes TEXT NOT NULL, homework_required INTEGER NOT NULL, homework_notes TEXT NOT NULL, PRIMARY KEY(user_id,course_key,date))')
         if not c.execute('SELECT 1 FROM timetable_template WHERE id=1').fetchone():
             seed=ROOT/'timetable.json'
             c.execute('INSERT INTO timetable_template VALUES(1,?)',(seed.read_text() if seed.exists() else '[]',))
@@ -296,6 +297,18 @@ class Handler(BaseHTTPRequestHandler):
                 courses=with_ids(courses,previous)
                 c.execute('UPDATE timetable_template SET data=? WHERE id=1',(json.dumps(courses,ensure_ascii=False),))
                 c.execute('UPDATE holidays SET data=? WHERE id=1',(json.dumps(holidays,ensure_ascii=False),));self.send(200,{'ok':True});return
+            if path=='/api/course-annotations' and method=='PUT':
+                key=data.get('course_key');date=dt.date.fromisoformat(data.get('date','')).isoformat()
+                timetable=json.loads((c.execute('SELECT data FROM user_timetable WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0])
+                course=next((x for x in timetable if x['course_id']==key),None)
+                semester=dt.date.fromisoformat(c.execute('SELECT start FROM settings WHERE user_id=?',(uid,)).fetchone()[0])
+                changes=json.loads((c.execute('SELECT data FROM user_course_exceptions WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0])
+                saved=c.execute('SELECT 1 FROM course_annotations WHERE user_id=? AND course_key=? AND date=?',(uid,key,date)).fetchone()
+                if not course or not (saved or occurs(course,semester,dt.date.fromisoformat(date)) or any(x['course_key']==key and x['date']==date for x in changes)):raise ValueError()
+                notes=data.get('notes','');required=data.get('homework_required',False);instructions=data.get('homework_notes','')
+                if not isinstance(notes,str) or len(notes)>4000 or type(required) is not bool or not isinstance(instructions,str) or len(instructions)>4000:raise ValueError()
+                c.execute('INSERT OR REPLACE INTO course_annotations VALUES(?,?,?,?,?,?)',(uid,key,date,notes,required,instructions))
+                self.send(200,{'ok':True});return
             if path=='/api/course-exceptions' and method=='PUT':
                 timetable=json.loads((c.execute('SELECT data FROM user_timetable WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0])
                 key=data.get('course_key');date=dt.date.fromisoformat(data.get('date','')).isoformat()

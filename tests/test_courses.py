@@ -19,6 +19,37 @@ class Courses(unittest.TestCase):
     def tearDown(self):
         test_app.API.tearDownClass.__func__(type(self))
 
+    def test_annotations_follow_occurrence_and_survive_restore_and_import(self):
+        state=self.req('state')[1];row=state['course_dates'][0]
+        key=row['course_key'];date=row['original_date']
+        data=dict(course_key=key,date=date,notes='带讲义 <script>',homework_required=True,homework_notes='交第二章习题\n纸质版')
+        self.assertEqual(self.req('course-annotations','PUT',data)[0],200)
+        def occurrence():
+            return next(c for c in self.req('state')[1]['course_dates'] if c['course_key']==key and c['original_date']==date)
+        self.assertEqual(occurrence()['notes'],data['notes'])
+        other=next(c for c in self.req('state')[1]['course_dates'] if c['course_key']==key and c['original_date']!=date)
+        self.assertFalse(other['homework_required'])
+        change=dict(course_key=key,date=date,new_date='2026-09-20',new_time='18:00–19:00')
+        self.assertEqual(self.req('course-exceptions','PUT',change)[0],200)
+        self.assertEqual(occurrence()['date'],'2026-09-20')
+        self.assertTrue(occurrence()['homework_required'])
+        self.assertEqual(self.req('course-exceptions','PUT',dict(course_key=key,date=date))[0],200)
+        self.assertEqual(self.req('timetable','POST',{})[0],200)
+        self.assertEqual(occurrence()['homework_notes'],data['homework_notes'])
+        with app.connect() as c:
+            viewer=dict(user_id=2,owner_id=1,active=1,policy=json.dumps({**DEFAULT_POLICY,'enabled':True,'timetable':True,'range':'semester'}))
+            shared=shared_state(c,viewer)['course_dates']
+            self.assertTrue(shared)
+            self.assertTrue(all('notes' not in x and 'homework_notes' not in x and 'homework_required' not in x for x in shared))
+        self.assertEqual(self.req('course-annotations','PUT',{**data,'homework_required':False})[0],200)
+        self.assertFalse(occurrence()['homework_required'])
+        for invalid in [dict(homework_required='yes'),dict(notes='x'*4001),dict(homework_notes=None),dict(course_key='unknown'),dict(date='2026-02-30')]:
+            self.assertEqual(self.req('course-annotations','PUT',{**data,**invalid})[0],400)
+        self.req('logout','POST',{});self.login('bob','other-password-123')
+        self.assertEqual(self.req('course-annotations','PUT',data)[0],400)
+        self.req('timetable','POST',{})
+        self.assertTrue(all(not c['homework_required'] and not c['notes'] for c in self.req('state')[1]['course_dates']))
+
     def test_holidays_are_inclusive_and_admin_only(self):
         template=self.req('timetable')[1]
         holiday=dict(name='国庆',start='2026-10-01',end='2026-10-07')

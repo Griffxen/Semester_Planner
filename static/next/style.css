@@ -174,3 +174,24 @@ html[data-theme=dark] .next-ui .daily-reminders .overdue>span{color:#f2a398}
 .next-ui .day-add{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;min-width:26px;padding:0;border:0;border-radius:4px;background:transparent;color:var(--muted);font-size:20px;line-height:1;flex-shrink:0}
 .next-ui .day-add:hover{background:transparent;color:var(--ink)}
 .next-ui .day-add:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.next-ui .compact-course strong{display:flex;align-items:center;gap:5px}
+.next-ui .course-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.next-ui .course-homework-badge{display:inline-flex;flex:none;align-items:center;justify-content:center;height:14px;min-width:24px;box-sizing:border-box;padding:0 3px;border:1px solid currentColor;border-radius:999px;color:#ad5544;font-size:9px;line-height:1;font-weight:600;letter-spacing:0}
+.next-ui .course-annotation-form{display:flex;flex-direction:column;flex:1;min-height:0;margin:0;overflow:hidden}
+.next-ui .course-annotation-form textarea{width:100%;box-sizing:border-box}
+.next-ui .course-annotation-form p{font-size:13px;color:var(--muted)}
+.next-ui #course-details,.next-ui #course-change-dialog{box-sizing:border-box;width:660px;height:min(700px,calc(100dvh - 32px));max-width:calc(100vw - 24px);overflow:auto;scrollbar-gutter:stable}
+.next-ui #course-details textarea,.next-ui #course-change-dialog textarea{resize:vertical}
+.next-ui #course-details[open]{display:flex;flex-direction:column;overflow:hidden;scrollbar-gutter:auto}
+.next-ui #course-details>.dialog-head,.next-ui #course-details>.task-detail-actions,.next-ui .course-annotation-form>.detail-tabs,.next-ui .course-annotation-footer{flex-shrink:0}
+.next-ui .course-tab-body{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;padding:12px 2px}
+.next-ui .course-tab-body .task-parameters{margin:0;align-content:start}
+.next-ui .course-annotation-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0}
+.next-ui .course-annotation-footer [data-error]{margin:0;min-height:20px}
+@media(max-width:700px){.next-ui #course-details,.next-ui #course-change-dialog{width:calc(100vw - 20px);max-width:calc(100vw - 20px);height:calc(100dvh - 24px)}}
+
+.next-ui .course-overview section{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.next-ui .course-overview h3{font-size:13px;margin:0 0 8px;color:var(--ink)}
+.next-ui .course-overview h4{font-size:12px;font-weight:500;margin:12px 0 6px;color:var(--muted)}
+.next-ui .course-overview .course-overview-text{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);line-height:1.7;margin:0}
+.next-ui .course-overview .course-overview-status{color:var(--ink);margin:0}

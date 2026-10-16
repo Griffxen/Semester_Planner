@@ -92,7 +92,7 @@ const shareAction=$('#share-admin-form').elements.action,shareActionLabel=shareA
 window.addEventListener('beforeunload',e=>{if(authPending){e.preventDefault();e.returnValue=''}});
 const oldSaveTemplate=$('#save-courses').onclick;$('#save-courses').onclick=async()=>{lastActionButton=$('#save-courses');if(!await askConfirm('更新公共课程模板及节假日？'))return;await oldSaveTemplate();if($('#timetable-dialog').open)nextCoursePreview()};
 // Course cards use the same two-line rhythm as tasks, retaining detail actions.
-courseBlocks=function(rows){return rows.map(c=>{const title=[c.name,c.date,c.time,c.room,c.adjusted?'原安排：'+c.original_date+' '+c.original_time:''].filter(Boolean).join(' · ');const body=`<strong>${esc(c.name)}${c.cancelled?' · 已取消':c.adjusted?' · 已调课':''}</strong><small>${esc(c.time)}${c.room?' · '+esc(c.room):''}</small>`;return `<div class="course-note compact-course ${c.cancelled?'course-cancelled':''}" title="${esc(title)}">${state.readonly?body:`<button class="course-open" data-course-key="${esc(c.course_key)}" data-course-date="${esc(c.original_date)}">${body}</button>`}</div>`}).join('')};
+courseBlocks=function(rows){return rows.map(c=>{const title=[c.name,c.date,c.time,c.room,c.adjusted?'原安排：'+c.original_date+' '+c.original_time:''].filter(Boolean).join(' · ');const body=`<strong><span class="course-name">${esc(c.name)}${c.cancelled?' · 已取消':c.adjusted?' · 已调课':''}</span>${c.homework_required?'<span class="course-homework-badge" title="本次课需交作业" aria-label="本次课需交作业">HW</span>':''}</strong><small>${esc(c.time)}${c.room?' · '+esc(c.room):''}</small>`;return `<div class="course-note compact-course ${c.cancelled?'course-cancelled':''}" title="${esc(title)}">${state.readonly?body:`<button class="course-open" data-course-key="${esc(c.course_key)}" data-course-date="${esc(c.original_date)}">${body}</button>`}</div>`}).join('')};
 if(state)render();
 // Low-frequency utilities have one entry and a stable peer-tab window.
 const utilityDialog=document.createElement('dialog');utilityDialog.id='utility-dialog';utilityDialog.innerHTML='<div class="dialog-head"><h2>设置与导出</h2><button type="button" id="utility-close" aria-label="关闭设置">×</button></div><div class="detail-tabs" role="tablist" aria-label="设置与导出"><button role="tab" data-utility-tab="settings">设置</button><button role="tab" data-utility-tab="export">导出</button></div>';document.body.append(utilityDialog);const utilities=document.querySelector('.side-bottom');utilityDialog.append(utilities);const utilityGroups=[...utilities.querySelectorAll(':scope > details')];let utilityTab='settings';
@@ -239,4 +239,36 @@ changeCategory=async function(data){
     for(const draft of drafts){const row=[...$('#category-rows').querySelectorAll('form')].find(row=>row.dataset.sourceName===draft.name);if(row)for(const [key,value] of Object.entries(draft.values))if(row.elements[key])row.elements[key].value=value}
     if(data.action==='create')$('#category-form').reset();
   }finally{controls.forEach(({el,disabled})=>el.disabled=disabled)}
+};
+
+// Personal notes belong to an original occurrence, independently of time changes.
+const courseDetailsBeforeAnnotations=showCourseDetails;
+showCourseDetails=function(key,date){
+  courseDetailsBeforeAnnotations(key,date);
+  if(state.readonly)return;
+  const dialog=$('#course-details'),course=state.course_dates?.find(c=>c.course_key===key&&c.original_date===date);
+  if(!dialog||!course)return;
+  const form=document.createElement('form');form.className='course-annotation-form';
+  form.innerHTML=`<nav class="detail-tabs" role="tablist" aria-label="课程详情">${[['info','详细信息'],['notes','修改备注'],['homework','作业设置'],['schedule','课程调整']].map(([id,label])=>`<button type="button" role="tab" id="course-tab-${id}" aria-controls="course-panel-${id}" data-course-detail-tab="${id}">${label}</button>`).join('')}</nav><div class="course-tab-body"><section role="tabpanel" id="course-panel-info" aria-labelledby="course-tab-info" data-course-panel="info"></section><section role="tabpanel" id="course-panel-notes" aria-labelledby="course-tab-notes" data-course-panel="notes" hidden><label>课程备注（选填）<textarea name="notes" rows="6" maxlength="4000" placeholder="本次课要带的材料、课堂提醒等">${esc(course.notes||'')}</textarea></label><p>仅记录本次课；调课、恢复时间和重新导入课表会保留。</p></section><section role="tabpanel" id="course-panel-homework" aria-labelledby="course-tab-homework" data-course-panel="homework" hidden><label class="check"><input name="homework_required" type="checkbox" ${course.homework_required?'checked':''}>本次课需交作业</label><p data-homework-hint></p><label data-homework-notes>作业说明（选填）<textarea name="homework_notes" rows="6" maxlength="4000" placeholder="填写题号、提交方式或其他要求">${esc(course.homework_notes||'')}</textarea></label></section><section role="tabpanel" id="course-panel-schedule" aria-labelledby="course-tab-schedule" data-course-panel="schedule" hidden><p>调整、取消或恢复这一次课程，仅影响你的个人课表。</p></section></div><div class="course-annotation-footer"><p data-error role="alert"></p><button class="primary" type="submit">保存备注与作业</button></div>`;
+  form.querySelector('[data-course-panel="info"]').append(dialog.querySelector('.task-parameters'));
+  const overview=document.createElement('div');overview.className='course-overview';form.querySelector('[data-course-panel="info"]').append(overview);
+  const renderOverview=data=>{overview.innerHTML=`<section><h3>课程备注</h3><p class="course-overview-text">${esc(data.notes||'未填写备注')}</p></section><section><h3>交作业</h3><p class="course-overview-status">${data.homework_required?'本次课需交作业':'本次课未设置交作业要求'}</p>${data.homework_required||data.homework_notes?`<h4>${data.homework_required?'作业说明':'作业说明草稿（未启用）'}</h4><p class="course-overview-text">${esc(data.homework_notes||'未填写作业说明')}</p>`:''}</section>`};renderOverview(course);
+
+  const scheduleActions=dialog.querySelector('.task-detail-actions');scheduleActions.before(form);form.querySelector('[data-course-panel="schedule"]').append(scheduleActions);
+  const tabs=[...form.querySelectorAll('[data-course-detail-tab]')];
+  const selectTab=id=>{form.querySelector('[type=submit]').style.visibility=['notes','homework'].includes(id)?'visible':'hidden';for(const tab of tabs){const active=tab.dataset.courseDetailTab===id;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1}for(const panel of form.querySelectorAll('[data-course-panel]'))panel.hidden=panel.dataset.coursePanel!==id;form.querySelector('.course-tab-body').scrollTop=0};
+  for(const [index,tab] of tabs.entries()){tab.onclick=()=>selectTab(tab.dataset.courseDetailTab);tab.onkeydown=e=>{let next;if(e.key==='ArrowRight')next=(index+1)%tabs.length;else if(e.key==='ArrowLeft')next=(index+tabs.length-1)%tabs.length;else if(e.key==='Home')next=0;else if(e.key==='End')next=tabs.length-1;else return;e.preventDefault();tabs[next].click();tabs[next].focus()}}selectTab('info');
+  const toggle=()=>{form.querySelector('[data-homework-notes]').hidden=!form.elements.homework_required.checked;form.querySelector('[data-homework-hint]').textContent=form.elements.homework_required.checked?'已开启：日历课程名后会显示 HW 标记，请在本次课提交。':'未开启交作业提醒。'};
+  form.elements.homework_required.onchange=toggle;toggle();
+  const snapshot=()=>JSON.stringify({notes:form.elements.notes.value,homework_required:form.elements.homework_required.checked,homework_notes:form.elements.homework_notes.value});let original=snapshot();
+  const canLeave=async()=>!courseSaving&&!confirmationPending&&(snapshot()===original||await askConfirm('放弃未保存的课程备注和作业设置？'));
+  dialog.querySelector('[data-close]').onclick=async()=>{if(await canLeave())dialog.close()};
+  dialog.oncancel=e=>{e.preventDefault();dialog.querySelector('[data-close]').click()};
+  for(const button of dialog.querySelectorAll('.task-detail-actions button')){const action=button.onclick;button.onclick=async e=>{if(await canLeave())return action?.call(button,e)}}
+  form.onsubmit=async e=>{
+    e.preventDefault();if(courseSaving||confirmationPending)return;
+    const data=JSON.parse(snapshot()),button=form.querySelector('[type=submit]'),error=form.querySelector('[data-error]');
+    courseSaving=true;button.disabled=true;error.textContent='';
+    try{await api('course-annotations','PUT',{course_key:key,date,...data});original=JSON.stringify(data);renderOverview(data);selectTab('info');await refresh();toast('已保存课程备注与作业设置')}catch(err){error.textContent=err.message}finally{courseSaving=false;button.disabled=false}
+  };
 };

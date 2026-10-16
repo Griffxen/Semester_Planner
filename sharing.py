@@ -48,6 +48,10 @@ def private_state(c,uid):
                 tasks=[dict(r) for r in c.execute('SELECT id,title,category,date,end_date,start_time,end_time,due,notes,done,version,milestones,short_title FROM tasks WHERE user_id=?',(uid,))],readonly=False)
     for task in result['tasks']:task['milestones']=json.loads(task['milestones'])
     result['course_dates']=expand(result['timetable'],result['settings']['start'],result['holidays'],result['course_exceptions'],include_cancelled=True)
+    annotations={(r['course_key'],r['date']):dict(r) for r in c.execute('SELECT course_key,date,notes,homework_required,homework_notes FROM course_annotations WHERE user_id=?',(uid,))}
+    for course in result['course_dates']:
+        annotation=annotations.get((course['course_key'],course['original_date']),{})
+        course.update(notes=annotation.get('notes',''),homework_required=bool(annotation.get('homework_required',False)),homework_notes=annotation.get('homework_notes',''))
     return result
 
 def shared_state(c,viewer,today=None):
