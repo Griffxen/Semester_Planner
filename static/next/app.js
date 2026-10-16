@@ -272,3 +272,22 @@ showCourseDetails=function(key,date){
     try{await api('course-annotations','PUT',{course_key:key,date,...data});original=JSON.stringify(data);renderOverview(data);selectTab('info');await refresh();toast('已保存课程备注与作业设置')}catch(err){error.textContent=err.message}finally{courseSaving=false;button.disabled=false}
   };
 };
+
+// Copy into the normal creation form; saving creates a separate task.
+function copyTask(id){
+  if(state.readonly||busy||confirmationPending)return;
+  const source=state.tasks.find(task=>task.id===id);if(!source)return;
+  $('#task-details')?.close();openTask(source.date);
+  for(const name of ['title','short_title','date','end_date','category','due','notes','start_time','end_time'])taskForm.elements[name].value=source[name]||'';
+  taskForm.elements.schedule_mode.value=source.start_time?'minute':'date';scheduleModeUI();
+  taskForm.elements.done.checked=false;
+  setMilestoneRows((source.milestones||[]).map(node=>({...node,done:false})));
+  taskSnapshot=JSON.stringify(Object.fromEntries(new FormData(taskForm)));
+  $('#task-heading').textContent='复制任务';selectTaskTab('content');taskForm.elements.title.focus();
+}
+const taskDetailsBeforeCopy=showTaskDetails;showTaskDetails=function(id){
+  taskDetailsBeforeCopy(id);if(state.readonly)return;
+  const actions=$('#task-details .task-detail-actions');if(!actions)return;
+  const button=document.createElement('button');button.type='button';button.textContent='复制任务';button.dataset.copyTask=id;button.onclick=()=>copyTask(id);
+  actions.querySelector('[data-edit]').after(button);
+};
