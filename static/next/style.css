@@ -176,7 +176,7 @@ html[data-theme=dark] .next-ui .daily-reminders .overdue>span{color:#f2a398}
 .next-ui .day-add:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .next-ui .compact-course strong{display:flex;align-items:center;gap:5px}
 .next-ui .course-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.next-ui .course-homework-badge{display:inline-flex;flex:none;align-items:center;justify-content:center;height:14px;min-width:24px;box-sizing:border-box;padding:0 3px;border:1px solid currentColor;border-radius:999px;color:#ad5544;font-size:9px;line-height:1;font-weight:600;letter-spacing:0}
+.next-ui .course-homework-badge{display:inline-flex;flex:none;align-items:center;justify-content:center;height:11px;min-width:18px;box-sizing:border-box;padding:0 2px;border:1px solid #c8b8a9;border-radius:999px;color:#9a8067;font-size:8px;line-height:1;font-weight:400;letter-spacing:0}
 .next-ui .course-annotation-form{display:flex;flex-direction:column;flex:1;min-height:0;margin:0;overflow:hidden}
 .next-ui .course-annotation-form textarea{width:100%;box-sizing:border-box}
 .next-ui .course-annotation-form p{font-size:13px;color:var(--muted)}
@@ -195,3 +195,7 @@ html[data-theme=dark] .next-ui .daily-reminders .overdue>span{color:#f2a398}
 .next-ui .course-overview h4{font-size:12px;font-weight:500;margin:12px 0 6px;color:var(--muted)}
 .next-ui .course-overview .course-overview-text{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);line-height:1.7;margin:0}
 .next-ui .course-overview .course-overview-status{color:var(--ink);margin:0}
+
+.next-ui .course-homework-badge.homework-done{color:#83968a;border-color:#bac6bd}
+html[data-theme=dark] .next-ui .course-homework-badge{color:#ac9983;border-color:#6d6559}
+html[data-theme=dark] .next-ui .course-homework-badge.homework-done{color:#8da295;border-color:#526b5d}

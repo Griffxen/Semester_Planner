@@ -22,7 +22,7 @@ class Courses(unittest.TestCase):
     def test_annotations_follow_occurrence_and_survive_restore_and_import(self):
         state=self.req('state')[1];row=state['course_dates'][0]
         key=row['course_key'];date=row['original_date']
-        data=dict(course_key=key,date=date,notes='带讲义 <script>',homework_required=True,homework_notes='交第二章习题\n纸质版')
+        data=dict(course_key=key,date=date,notes='带讲义 <script>',homework_required=True,homework_done=True,homework_notes='交第二章习题\n纸质版')
         self.assertEqual(self.req('course-annotations','PUT',data)[0],200)
         def occurrence():
             return next(c for c in self.req('state')[1]['course_dates'] if c['course_key']==key and c['original_date']==date)
@@ -33,22 +33,43 @@ class Courses(unittest.TestCase):
         self.assertEqual(self.req('course-exceptions','PUT',change)[0],200)
         self.assertEqual(occurrence()['date'],'2026-09-20')
         self.assertTrue(occurrence()['homework_required'])
+        self.assertTrue(occurrence()['homework_done'])
         self.assertEqual(self.req('course-exceptions','PUT',dict(course_key=key,date=date))[0],200)
         self.assertEqual(self.req('timetable','POST',{})[0],200)
         self.assertEqual(occurrence()['homework_notes'],data['homework_notes'])
+        self.assertTrue(occurrence()['homework_done'])
+        legacy={k:v for k,v in data.items() if k!='homework_done'}
+        self.assertEqual(self.req('course-annotations','PUT',legacy)[0],200)
+        self.assertTrue(occurrence()['homework_done'])
+        self.assertEqual(self.req('course-annotations','PUT',{**data,'homework_done':False})[0],200)
+        self.assertFalse(occurrence()['homework_done'])
         with app.connect() as c:
             viewer=dict(user_id=2,owner_id=1,active=1,policy=json.dumps({**DEFAULT_POLICY,'enabled':True,'timetable':True,'range':'semester'}))
             shared=shared_state(c,viewer)['course_dates']
             self.assertTrue(shared)
-            self.assertTrue(all('notes' not in x and 'homework_notes' not in x and 'homework_required' not in x for x in shared))
+            self.assertTrue(all('notes' not in x and 'homework_notes' not in x and 'homework_required' not in x and 'homework_done' not in x for x in shared))
         self.assertEqual(self.req('course-annotations','PUT',{**data,'homework_required':False})[0],200)
         self.assertFalse(occurrence()['homework_required'])
-        for invalid in [dict(homework_required='yes'),dict(notes='x'*4001),dict(homework_notes=None),dict(course_key='unknown'),dict(date='2026-02-30')]:
+        self.assertFalse(occurrence()['homework_done'])
+        for invalid in [dict(homework_required='yes'),dict(homework_done='yes'),dict(homework_done=1),dict(notes='x'*4001),dict(homework_notes=None),dict(course_key='unknown'),dict(date='2026-02-30')]:
             self.assertEqual(self.req('course-annotations','PUT',{**data,**invalid})[0],400)
         self.req('logout','POST',{});self.login('bob','other-password-123')
         self.assertEqual(self.req('course-annotations','PUT',data)[0],400)
         self.req('timetable','POST',{})
-        self.assertTrue(all(not c['homework_required'] and not c['notes'] for c in self.req('state')[1]['course_dates']))
+        self.assertTrue(all(not c['homework_required'] and not c['homework_done'] and not c['notes'] for c in self.req('state')[1]['course_dates']))
+
+    def test_existing_homework_migration_preserves_content(self):
+        row=self.req('state')[1]['course_dates'][0]
+        data=dict(course_key=row['course_key'],date=row['original_date'],notes='原备注',homework_required=True,homework_notes='原作业说明')
+        self.assertEqual(self.req('course-annotations','PUT',data)[0],200)
+        with app.connect() as c:
+            c.execute('ALTER TABLE course_annotations DROP COLUMN homework_done')
+        app.init();app.init()
+        migrated=next(c for c in self.req('state')[1]['course_dates'] if c['course_key']==data['course_key'] and c['original_date']==data['date'])
+        self.assertEqual(migrated['notes'],data['notes'])
+        self.assertEqual(migrated['homework_notes'],data['homework_notes'])
+        self.assertTrue(migrated['homework_required'])
+        self.assertFalse(migrated['homework_done'])
 
     def test_holidays_are_inclusive_and_admin_only(self):
         template=self.req('timetable')[1]
