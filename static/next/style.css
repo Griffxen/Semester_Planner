@@ -231,3 +231,23 @@ html[data-theme=dark] .next-ui .course-homework-badge.homework-done{color:#8da29
 .next-ui #category-dialog .category-row .deadline-threshold{font-size:10px;gap:3px}
 .next-ui #category-dialog .category-row [data-move-category]{grid-column:auto;justify-self:stretch;padding:6px;font-size:11px}
 @media(max-width:600px){.next-ui #category-dialog .category-row{grid-template-columns:minmax(70px,1fr) 38px 64px 64px}.next-ui #category-dialog .category-row>input[name=name]{grid-column:1;grid-row:1}.next-ui #category-dialog .category-row>input[type=color]{grid-column:2;grid-row:1}.next-ui #category-dialog .category-save{grid-column:3;grid-row:2}.next-ui #category-dialog .category-row [data-move-category]{grid-column:4;grid-row:2;font-size:10px}}
+
+/* Compact settings and overview spacing. */
+.next-ui header{margin-bottom:16px}
+.next-ui .stats{gap:10px;margin-bottom:14px}
+.next-ui .stats>div{min-height:74px;padding:10px 14px}
+.next-ui .context-panels{margin-bottom:14px;gap:10px}
+.next-ui dialog{padding:20px}
+.next-ui .dialog-head{top:-20px;padding:4px 0 10px;margin-bottom:10px}
+.next-ui dialog label{margin-bottom:10px}
+.next-ui dialog p[role=alert]:empty{margin:0}
+.next-ui .detail-tabs,.next-ui .account-tabs{margin-bottom:12px}
+.next-ui #account-dialog{height:min(500px,calc(100dvh - 32px));max-height:calc(100dvh - 32px)}
+.next-ui #account-form>.primary{margin-top:12px}
+.next-ui .share-editor-footer{justify-content:flex-end;padding-top:10px;margin-top:10px}
+@media(max-width:700px){
+  .next-ui dialog{padding:16px}
+  .next-ui .dialog-head{top:-16px}
+  .next-ui .stats{gap:8px}
+  .next-ui .stats>div{min-height:70px;padding:9px 12px}
+}
