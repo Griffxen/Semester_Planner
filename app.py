@@ -104,11 +104,14 @@ class Handler(BaseHTTPRequestHandler):
         if path in ('/api/v1/agenda','/api/v1/agenda/meta') and method!='GET':
             self.send(405,{'error':'只支持读取'}); return
         assets={'/':'next/index.html', '/next':'next/index.html', '/next/':'next/index.html',
-                '/legacy':'legacy/index.html', '/legacy/':'legacy/index.html'}
+                '/legacy':'legacy/index.html', '/legacy/':'legacy/index.html',
+                '/m':'mobile/index.html', '/m/':'mobile/index.html',
+                '/mobile-entry.js':'mobile-entry.js'}
         for prefix,names in [('',('app.js','style.css','icon.svg','share.js')),
                              ('legacy/',('app.js','style.css','icon.svg','share.js','transition.css')),
-                             ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css'))]:
-            assets.update({'/'+prefix+name:prefix+name for name in names})
+                             ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css')),
+                             ('m/',('app.js','domain.js','tasks.js','courses.js','manage.js','style.css'))]:
+            assets.update({'/'+prefix+name:('mobile/' if prefix=='m/' else prefix)+name for name in names})
         if method=='GET' and path in assets:
             f=ROOT/'static'/assets[path]
             ctype={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',

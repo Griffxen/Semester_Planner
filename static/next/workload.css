@@ -1,0 +1,20 @@
+/* One restrained time-bar palette for both shells. */
+:root{--timeline-timed:#6f927c;--timeline-untimed:#b38a61}
+html[data-theme=dark]{--timeline-timed:#8eae98;--timeline-untimed:#bd9b79}
+.timebar{height:4px;position:relative;overflow:hidden;border-radius:3px;background:var(--soft)}
+.timebar>i{position:absolute;height:100%;border-radius:2px;background:var(--timeline-timed)}
+.timebar>i.timebar-untimed{background:var(--timeline-untimed);opacity:calc(.22 + .58 * var(--density-strength,0))}
+.timebar-dots{position:absolute;inset:0;pointer-events:none}
+.timebar-dots>b{position:absolute;top:calc(50% - 1px);width:2px;height:2px;border-radius:50%;background:var(--muted);opacity:.6;transform:translateX(-50%)}
+.timebar-dots>.at-8{left:0;transform:none}.timebar-dots>.at-12{left:25%}.timebar-dots>.at-18{left:62.5%}.timebar-dots>.at-24{left:100%;transform:translateX(-100%)}
+.timeline-key{display:inline-block;width:6px;height:6px;margin-right:5px;border-radius:2px;background:var(--timeline-timed);vertical-align:1px}
+.timeline-key.is-untimed{background:var(--timeline-untimed)}
+/* Warm workload is a continuous background; scheduled slots sit above it. */
+.timebar.has-untimed::before{content:"";position:absolute;inset:0;background:var(--timeline-untimed);opacity:calc(.22 + .58 * var(--density-strength,0))}
+.timebar>i{z-index:1}.timebar-dots{z-index:2}
+.workload-density{padding:0 20px 12px;flex-shrink:0}.workload-density[hidden]{display:none}
+.workload-legend button{border:0;background:transparent;padding:0;min-height:28px;font-size:11px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.density-settings{color:var(--ink);font-size:13px}.density-settings label{display:block}.density-settings output{float:right;color:var(--muted)}
+.density-settings input[type=range]{display:block;width:100%;min-height:44px;padding:0;accent-color:var(--timeline-untimed);cursor:pointer}
+.density-settings p{font-size:11px;color:var(--muted);margin:6px 0}.density-settings button{min-height:44px;font-size:12px}
+.density-samples{display:flex;gap:8px;margin:12px 0}.density-samples>span{flex:1;min-width:0;text-align:center}.density-samples .timebar{display:block;height:8px}.density-samples small{display:block;margin-top:5px;color:var(--muted);font-size:10px}

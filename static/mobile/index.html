@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#315d4b">
+  <title>学期手记 · 手机版</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg?v=2">
+  <script src="/next/theme.js"></script>
+  <link rel="stylesheet" href="/next/paint.css">
+  <link rel="stylesheet" href="/m/style.css">
+  <link rel="stylesheet" href="/next/workload.css">
+  <script defer src="/next/icons.js"></script>
+  <script defer src="/next/hints.js"></script>
+  <script defer src="/m/domain.js"></script>
+  <script defer src="/m/app.js"></script>
+  <script defer src="/next/workload.js"></script>
+  <script defer src="/m/tasks.js"></script>
+  <script defer src="/m/courses.js"></script>
+  <script defer src="/m/manage.js"></script>
+</head>
+<body>
+  <section id="m-login" class="m-login" hidden>
+    <div class="m-login-card">
+      <div class="m-brand"><img src="/icon.svg?v=2" alt="">学期手记</div>
+      <h1>从今天开始。</h1><p class="m-muted">随时查看安排，记下新的计划。</p>
+      <form id="m-login-form">
+        <label class="m-field">账号<input name="name" autocomplete="username" required maxlength="64"></label>
+        <label class="m-field">密码<input name="password" type="password" autocomplete="current-password" required></label>
+        <p id="m-login-error" class="m-error" role="alert"></p>
+        <button class="primary" type="submit">登录</button>
+      </form>
+      <a href="/?desktop=1">使用电脑版</a>
+    </div>
+  </section>
+  <div id="m-app" hidden>
+    <header id="m-header" class="m-header">
+      <div class="m-heading"><span id="m-subtitle" class="m-eyebrow">学期手记</span><h1 id="m-title">今天</h1></div>
+      <div id="m-header-actions" class="m-header-actions"></div>
+    </header>
+    <div id="m-share-banner" class="m-share-banner" hidden></div>
+    <main id="m-content" aria-live="polite"><p class="m-empty">正在读取日程…</p></main>
+    <nav id="m-nav" class="m-nav" aria-label="手机主导航">
+      <button data-tab="agenda" data-icon="sun" aria-current="page">日程</button>
+      <button data-tab="overview" data-icon="grid">总览</button>
+      <button data-tab="more" data-icon="user">更多</button>
+    </nav>
+  </div>
+  <div id="m-pages"></div>
+  <dialog id="m-confirm" class="m-confirm" aria-labelledby="m-confirm-title">
+    <header><h2 id="m-confirm-title">确认操作</h2><button type="button" id="m-confirm-cancel" aria-label="取消确认">取消</button></header>
+    <p id="m-confirm-message"></p>
+    <button type="button" id="m-confirm-slider" class="m-confirm-slider" aria-label="向右滑动确认；键盘按右方向键后按 Enter">
+      <span class="m-slider-label">向右滑动确认</span><span class="m-slider-handle" aria-hidden="true">→</span>
+    </button>
+    <p class="m-meta">滑动到末端提交 · 取消不会保存</p>
+  </dialog>
+  <div id="m-toast" role="status" hidden></div>
+  <div id="m-undo" class="m-undo" hidden></div>
+</body>
+</html>

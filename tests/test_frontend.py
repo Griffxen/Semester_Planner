@@ -32,7 +32,17 @@ class Frontend(unittest.TestCase):
                             ('/next/hints.js', 'text/javascript'),
                             ('/next/theme.js', 'text/javascript'),
                             ('/next/paint.css', 'text/css'),
-                            ('/next/style.css', 'text/css')]:
+                            ('/next/style.css', 'text/css'),
+                            ('/next/workload.js', 'text/javascript'),
+                            ('/next/workload.css', 'text/css'),
+                            ('/m/', 'text/html'), ('/m', 'text/html'),
+                            ('/mobile-entry.js', 'text/javascript'),
+                            ('/m/domain.js', 'text/javascript'),
+                            ('/m/app.js', 'text/javascript'),
+                            ('/m/tasks.js', 'text/javascript'),
+                            ('/m/courses.js', 'text/javascript'),
+                            ('/m/manage.js', 'text/javascript'),
+                            ('/m/style.css', 'text/css')]:
             with self.subTest(route=route), urllib.request.urlopen(self.url + route) as res:
                 self.assertEqual(res.status, 200)
                 self.assertTrue(res.headers['Content-Type'].startswith(mime))
@@ -57,3 +67,15 @@ class Frontend(unittest.TestCase):
             with self.subTest(name=name):
                 file = root / ('original.html' if name == 'index.html' else name)
                 self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(), expected)
+
+    def test_mobile_shell_is_independent_and_csp_compatible(self):
+        html = (app.ROOT / 'static/mobile/index.html').read_text()
+        self.assertNotIn('/legacy/app.js', html)
+        self.assertNotIn('/next/app.js', html)
+        self.assertNotIn('<script>', html)
+        self.assertIn('viewport-fit=cover', html)
+        self.assertLess(html.index('/m/app.js'), html.index('/m/tasks.js'))
+        for tab in ('agenda', 'overview', 'more'):
+            self.assertIn('data-tab="' + tab + '"', html)
+        desktop = (app.ROOT / 'static/next/index.html').read_text()
+        self.assertLess(desktop.index('/mobile-entry.js'), desktop.index('/legacy/app.js'))
