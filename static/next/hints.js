@@ -23,3 +23,9 @@ function calendarMilestones(tasks,date,hideDone=false){
   return tasks.flatMap(task=>(task.milestones||[]).filter(node=>node.stop_at.slice(0,10)===date&&(!hideDone||!node.done)).map(node=>({task,node})))
     .sort((a,b)=>a.node.stop_at.localeCompare(b.node.stop_at)||String(a.task.id).localeCompare(String(b.task.id)));
 }
+
+// Only actual range ends get a daily block; clipped sharing boundaries are not ends.
+function calendarTaskEnds(tasks,date,hideDone=false){
+  return tasks.filter(task=>(task.end_date>task.date||task.continues_before)&&task.end_date===date&&!task.continues_after&&(!hideDone||!task.done))
+    .sort((a,b)=>(a.end_time||'99:99').localeCompare(b.end_time||'99:99')||String(a.id).localeCompare(String(b.id)));
+}

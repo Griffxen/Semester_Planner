@@ -28,3 +28,12 @@ assert.deepEqual(Array.from(ctx.calendarMilestones(nodeTasks,'2026-10-16'),x=>x.
 assert.equal(ctx.calendarMilestones(nodeTasks,'2026-10-16',true).length,2,'Hide completed nodes without losing other dates');
 assert.equal(ctx.calendarMilestones(nodeTasks,'2026-10-15').length,0,'No node entry on other dates');
 assert.equal(nodeTasks[0].milestones.length,2,'Projection preserves original nodes');
+
+const endTasks=[{id:'long',date:'2026-10-01',end_date:'2026-10-17',end_time:'16:30',done:false},{id:'date-only',date:'2026-10-16',end_date:'2026-10-17',end_time:'',done:true},{id:'single',date:'2026-10-17',end_date:'2026-10-17',end_time:'18:00',done:false},{id:'clipped',date:'2026-10-16',end_date:'2026-10-17',continues_after:true,done:false}];
+assert.deepEqual(Array.from(ctx.calendarTaskEnds(endTasks,'2026-10-17'),t=>t.id),['long','date-only']);
+assert.equal(ctx.calendarTaskEnds(endTasks,'2026-10-16').length,0,'Only end dates get end blocks');
+assert.deepEqual(Array.from(ctx.calendarTaskEnds(endTasks,'2026-10-17',true),t=>t.id),['long']);
+endTasks[0].done=true;
+assert.equal(ctx.calendarTaskEnds(endTasks,'2026-10-17')[0].done,true,'End status follows the actual task');
+assert.equal(ctx.calendarTaskEnds(endTasks,'2026-10-17',true).length,0);
+assert.equal(ctx.calendarTaskEnds([{id:'shared-final-day',date:'2026-10-17',end_date:'2026-10-17',continues_before:true,continues_after:false}],'2026-10-17').length,1,'A shared last day retains the actual ending');
