@@ -9,6 +9,28 @@ html[data-theme=dark]{--timeline-timed:#8eae98;--timeline-untimed:#bd9b79}
 .timebar-dots>.at-8{left:0;transform:none}.timebar-dots>.at-12{left:25%}.timebar-dots>.at-18{left:62.5%}.timebar-dots>.at-24{left:100%;transform:translateX(-100%)}
 .timeline-key{display:inline-block;width:6px;height:6px;margin-right:5px;border-radius:2px;background:var(--timeline-timed);vertical-align:1px}
 .timeline-key.is-untimed{background:var(--timeline-untimed)}
+.next-ui #time-distribution-dialog{width:min(720px,calc(100vw - 32px));height:min(680px,calc(100dvh - 32px));padding:0;overflow:hidden}
+.next-ui #time-distribution-dialog[open]{display:flex;flex-direction:column}
+.workload-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px 8px;gap:12px;flex-shrink:0}
+.workload-head h2{font-size:18px!important;margin:0}
+.workload-head button{min-width:44px;min-height:44px;padding:6px;background:transparent;border:0;font-size:23px;color:var(--muted)}
+.workload-controls{display:flex;align-items:center;gap:8px;padding:0 20px 12px;flex-shrink:0}
+.workload-controls strong{flex:1;text-align:center;font-size:13px;font-weight:500}
+.workload-controls button{min-height:36px;min-width:36px}
+.workload-legend{display:flex;align-items:center;gap:16px;padding:0 20px 10px;color:var(--muted);font-size:11px;flex-wrap:wrap;flex-shrink:0}
+.workload-legend>span:last-child{margin-left:auto}
+.workload-body{min-height:0;flex:1;overflow:auto;overscroll-behavior:contain;padding:0 20px 18px;scrollbar-gutter:stable}
+.workload-day{display:flex;align-items:center;gap:16px;min-height:56px;padding:10px 0;border-top:1px solid var(--line)}
+.workload-day.is-today{background:var(--soft)}
+.workload-date{flex-shrink:0;width:50px;text-align:center;font-size:10px;color:var(--muted)}
+.workload-date strong{display:block;color:var(--ink);font-size:13px;font-weight:500}
+.workload-day-main{flex:1;min-width:0}
+.workload-day-title{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.workload-bar{height:6px}
+.workload-day-meta{display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap;margin-top:6px;color:var(--muted);font-size:10px}
+.workload-day-meta:empty{display:none}.workload-error{color:var(--muted);font-size:12px;white-space:pre-wrap}
+@media(min-width:701px) and (max-width:950px){.next-ui .toolbar{flex-wrap:wrap}.next-ui .toolbar .nav-tools{flex-wrap:wrap}}
+
 /* Warm workload is a continuous background; scheduled slots sit above it. */
 .timebar.has-untimed::before{content:"";position:absolute;inset:0;background:var(--timeline-untimed);opacity:calc(.22 + .58 * var(--density-strength,0))}
 .timebar>i{z-index:1}.timebar-dots{z-index:2}
