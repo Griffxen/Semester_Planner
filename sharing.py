@@ -59,17 +59,28 @@ def private_state(c,uid):
         course.update(notes=annotation.get('notes',''),homework_required=bool(annotation.get('homework_required',False)),homework_notes=annotation.get('homework_notes',''),homework_done=bool(annotation.get('homework_done',False)))
     return result
 
-def shared_state(c,viewer,today=None):
+def policy_range(settings, policy, today=None, clamp=True):
+    start=dt.date.fromisoformat(settings['start']); end=start+dt.timedelta(days=125)
+    today=today or dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).date()
+    lo,hi=start,end
+    if policy['range'] in ('week','two'):
+        lo=today-dt.timedelta(days=today.weekday());hi=lo+dt.timedelta(days=6 if policy['range']=='week' else 13)
+    elif policy['range']=='custom':lo,hi=dt.date.fromisoformat(policy['start']),dt.date.fromisoformat(policy['end'])
+    if clamp:lo,hi=max(lo,start),min(hi,end)
+    return lo.isoformat(),hi.isoformat()
+
+
+def task_in_range(task, lo, hi, points=False):
+    return (task['date']<=hi and task['end_date']>=lo) or (points and (
+        bool(task.get('due') and lo<=task['due'][:10]<=hi) or
+        any(lo<=m['stop_at'][:10]<=hi for m in task.get('milestones',[]))))
+
+
+def shared_state(c,viewer,today=None,export_keys=False):
     # This projection is used identically by viewers, owner previews and export checks.
     own=private_state(c,viewer['owner_id'])
     p=json.loads(viewer['policy'])
-    start=dt.date.fromisoformat(own['settings']['start']);end=start+dt.timedelta(days=125)
-    today=today or dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).date()
-    lo,hi=start,end
-    if p['range'] in ('week','two'):
-        lo=today-dt.timedelta(days=today.weekday());hi=lo+dt.timedelta(days=6 if p['range']=='week' else 13)
-    elif p['range']=='custom':lo,hi=dt.date.fromisoformat(p['start']),dt.date.fromisoformat(p['end'])
-    lo,hi=max(lo,start).isoformat(),min(hi,end).isoformat()
+    lo,hi=policy_range(own['settings'],p,today)
     enabled=bool(viewer['active'] and p['enabled'])
     busy=p.get('busy_only',False)
     account=dict(c.execute('SELECT name,remark FROM users WHERE id=?',(viewer['user_id'],)).fetchone())
@@ -84,7 +95,7 @@ def shared_state(c,viewer,today=None):
     if not enabled or lo>hi:return result
     result['categories']=[x for x in own['categories'] if x['name'] in p['categories']]
     for t in own['tasks']:
-        if t['category'] not in p['categories'] or (t['done'] and not p['done']) or t['date']>hi or t['end_date']<lo:continue
+        if t['category'] not in p['categories'] or (t['done'] and not p['done']) or not task_in_range(t,lo,hi):continue
         visible={k:t[k] for k in ('id','title','category','date','end_date','start_time','end_time','due','notes','done','short_title')}
         visible.update(continues_before=t['date']<lo,continues_after=t['end_date']>hi,
                        date=max(t['date'],lo),end_date=min(t['end_date'],hi),
@@ -98,28 +109,31 @@ def shared_state(c,viewer,today=None):
     if p['journal']!='none':
         result['journal']=[dict(date=j['date'],body=j['body']) for j in own['journal'] if lo<=j['date']<=hi and (p['journal']=='all' or j['date'] in p['journal_dates'])]
     if p['timetable']:
-        result['course_dates']=[{k:course[k] for k in ('date','name','time','room')}
+        result['course_dates']=[{k:course[k] for k in (('date','name','time','room','course_key','original_date') if export_keys else ('date','name','time','room'))}
                                 for course in own['course_dates'] if not course['cancelled'] and lo<=course['date']<=hi]
-    if busy:
-        # Never send the original identifiers, titles, status, category, notes or diary.
-        counts={};ranges=[]
-        for task in result['tasks']:
-            if task['start_time']:continue
-            if task['date']!=task['end_date'] or task['continues_before'] or task['continues_after']:
-                ranges.append(dict(id='arrangement-'+str(len(ranges)),title='另有安排',category='另有安排',
-                                   date=task['date'],end_date=task['end_date'],start_time='',end_time='',
-                                   due='',notes='',done=False,short_title='',milestones=[],continues_before=task['continues_before'],
-                                   continues_after=task['continues_after']))
-            else:
-                key=task['date'];counts[key]=counts.get(key,0)+1
-        result['date_counts']=[dict(date=day,count=count) for day,count in sorted(counts.items())]
-        slots=sorted(set((t['date'],t['end_date'],'',t['start_time'],t['end_time'],t['continues_before'],t['continues_after']) for t in result['tasks'] if t['start_time']))
-        result['categories']=[dict(name='已占用',color='#81918b')] if slots or result['course_dates'] else []
-        if ranges:result['categories'].append(dict(name='另有安排',color='#81918b'))
-        result['tasks']=[dict(id='busy-'+str(i),title='已占用',category='已占用',date=a,end_date=b,due=d,start_time=st,end_time=et,notes='',done=False,short_title='',milestones=[],continues_before=before,continues_after=after) for i,(a,b,d,st,et,before,after) in enumerate(slots)]+ranges
-        result['journal']=[]
-        result['course_dates']=[dict(date=d,time=t,name='已占用',room='') for d,t in sorted(set((x['date'],x['time']) for x in result['course_dates']))]
+    if busy: anonymize(result)
     return result
+
+
+def anonymize(result):
+    # Never send the original identifiers, titles, status, category, notes or diary.
+    counts={};ranges=[]
+    for task in result['tasks']:
+        if task['start_time']:continue
+        if task['date']!=task['end_date'] or task['continues_before'] or task['continues_after']:
+            ranges.append(dict(id='arrangement-'+str(len(ranges)),title='另有安排',category='另有安排',
+                               date=task['date'],end_date=task['end_date'],start_time='',end_time='',
+                               due='',notes='',done=False,short_title='',milestones=[],continues_before=task['continues_before'],
+                               continues_after=task['continues_after']))
+        else:
+            key=task['date'];counts[key]=counts.get(key,0)+1
+    result['date_counts']=[dict(date=day,count=count) for day,count in sorted(counts.items())]
+    slots=sorted(set((t['date'],t['end_date'],'',t['start_time'],t['end_time'],t['continues_before'],t['continues_after']) for t in result['tasks'] if t['start_time']))
+    result['categories']=[dict(name='已占用',color='#81918b')] if slots or result['course_dates'] else []
+    if ranges:result['categories'].append(dict(name='另有安排',color='#81918b'))
+    result['tasks']=[dict(id='busy-'+str(i),title='已占用',category='已占用',date=a,end_date=b,due=d,start_time=st,end_time=et,notes='',done=False,short_title='',milestones=[],continues_before=before,continues_after=after) for i,(a,b,d,st,et,before,after) in enumerate(slots)]+ranges
+    result['journal']=[]
+    result['course_dates']=[dict(date=d,time=t,name='已占用',room='') for d,t in sorted(set((x['date'],x['time']) for x in result['course_dates']))]
 
 def drop_category_permissions(c,uid,name):
     # Renaming/deleting never silently grants permission to a newly created category.

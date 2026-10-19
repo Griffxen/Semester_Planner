@@ -3,6 +3,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from sharing import init_sharing, DEFAULT_POLICY, validate_policy, private_state, shared_state, drop_category_permissions
 from dashboard_api import agenda as dashboard_agenda, meta as dashboard_meta
+from exporting import project_export
 from courses import migrate_ids, with_ids, occurs, is_holiday
 ROOT=Path(__file__).resolve().parent
 DB=Path(os.environ.get('PLANNER_DB', ROOT/'data/planner.db'))
@@ -131,10 +132,10 @@ class Handler(BaseHTTPRequestHandler):
                 '/legacy':'legacy/index.html', '/legacy/':'legacy/index.html',
                 '/m':'mobile/index.html', '/m/':'mobile/index.html',
                 '/mobile-entry.js':'mobile-entry.js'}
-        for prefix,names in [('',('app.js','style.css','icon.svg','share.js','deferred.js','deferred.css')),
+        for prefix,names in [('',('app.js','style.css','icon.svg','share.js','export.js','export.css','deferred.js','deferred.css')),
                              ('legacy/',('app.js','style.css','icon.svg','share.js','transition.css')),
-                             ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css','deferred.js')),
-                             ('m/',('app.js','domain.js','tasks.js','courses.js','manage.js','style.css'))]:
+                             ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css','export-entry.js','deferred.js')),
+                             ('m/',('app.js','domain.js','tasks.js','courses.js','manage.js','style.css','export-entry.js'))]:
             assets.update({'/'+prefix+name:('mobile/' if prefix=='m/' else prefix)+name for name in names})
         if method=='GET' and path in assets:
             f=ROOT/'static'/assets[path]
@@ -178,8 +179,19 @@ class Handler(BaseHTTPRequestHandler):
             viewer=c.execute('SELECT * FROM viewers WHERE user_id=?',(uid,)).fetchone()
             if viewer and not viewer['active']:
                 self.send(401,{'error':'展示账户已停用，请退出'});return
-            if viewer and (path,method) not in {('/api/state','GET'),('/api/view-export','GET'),('/api/password','POST'),('/api/username','POST'),('/api/logout','POST')}:
+            if viewer and (path,method) not in {('/api/state','GET'),('/api/view-export','GET'),('/api/export-preview','POST'),('/api/password','POST'),('/api/username','POST'),('/api/logout','POST')}:
                 self.send(403,{'error':'展示账户只能查看获准分享的内容'});return
+            if path=='/api/export-preview' and method=='POST':
+                if not isinstance(data,dict):raise ValueError()
+                target=viewer
+                if data.get('preview_id') is not None:
+                    if viewer:self.send(403,{'error':'不能预览他人的分享'});return
+                    target=c.execute('SELECT * FROM viewers WHERE user_id=? AND owner_id=?',(int(data['preview_id']),uid)).fetchone()
+                    if not target:self.send(403,{'error':'不能预览他人的分享'});return
+                source=shared_state(c,target,export_keys=True) if target else private_state(c,uid)
+                if target and (data.get('format','image')!='image' or not source['share']['export']):
+                    self.send(403,{'error':'当前分享未允许此项导出'});return
+                self.send(200,project_export(source,data));return
             if path=='/api/users' and method=='GET':
                 if not actor['admin']:
                     self.send(403,{'error':'仅管理员可查看账户汇总'});return
