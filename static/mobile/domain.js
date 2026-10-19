@@ -34,8 +34,8 @@
     const projected=(data.date_counts||[]).find(item=>item.date===date)?.count||0;
     const ends=tasks.filter(task=>task.date<task.end_date&&task.end_date===date).length;
     const dated=entries.dated.length+projected;
-    // Nodes, planned ends and independent deadlines are points, not occupied duration.
-    const points=entries.nodes.length+ends+entries.timed.filter(item=>item.kind==='deadline').length;
+    // Nodes and planned ends add workload; an independent deadline is a reminder, not another item.
+    const points=entries.nodes.length+ends;
     const slots=entries.courses.length+tasks.filter(task=>task.start_time&&task.date<=date&&task.end_date>=date&&(task.end_date!==date||task.end_time!=='00:00')).length;
     return {slots,dated,points,untimed:dated+points};
   }

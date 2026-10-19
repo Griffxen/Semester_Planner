@@ -60,8 +60,8 @@ assert.equal(entry(390,'','1'),null);
 assert.equal(entry(390,'?mobile=1','1'),'/m/');
 console.log('Mobile calendar, free-time density and entry selection checks passed');
 
-assert.deepEqual(U.workloadCounts(data,'2026-10-17',filters),{slots:2,dated:1,points:2,untimed:3});
-assert.equal(U.workloadCounts(data,'2026-10-17',{...filters,hideDone:true}).untimed,2);
+assert.deepEqual(U.workloadCounts(data,'2026-10-17',filters),{slots:2,dated:1,points:1,untimed:2});
+assert.equal(U.workloadCounts(data,'2026-10-17',{...filters,hideDone:true}).untimed,1);
 assert.deepEqual(U.workloadCounts(data,'2026-10-25',filters),{slots:0,dated:0,points:1,untimed:1},'long task end counts once on its end date');
 assert.equal(U.workloadCounts(data,'2026-10-24',filters).untimed,0,'long task is not counted on every day');
 assert.equal(U.workloadCounts(data,'2026-10-26',filters).untimed,1,'point node counts without occupied duration');
@@ -74,7 +74,13 @@ assert.throws(()=>U.setDensityThreshold(0));
 assert.throws(()=>U.setDensityThreshold(Infinity));
 U.setDensityThreshold(1);assert.equal(U.densityThreshold(),1);assert.equal(U.scheduleDensity([],4).strength,.25);U.setDensityThreshold(.5);
 
-assert.deepEqual(U.workloadCounts(data,'2026-10-17',{...filters,showCourses:false}),{slots:1,dated:1,points:2,untimed:3});
-assert.deepEqual(U.workloadCounts(data,'2026-10-17',{...filters,category:'个人'}),{slots:1,dated:1,points:1,untimed:2});
+assert.deepEqual(U.workloadCounts(data,'2026-10-17',{...filters,showCourses:false}),{slots:1,dated:1,points:1,untimed:2});
+assert.deepEqual(U.workloadCounts(data,'2026-10-17',{...filters,category:'个人'}),{slots:1,dated:1,points:0,untimed:1});
 const overlapData={...data,tasks:[...tasks,{...tasks[0],id:'overlap',start_time:'09:30',end_time:'10:30'}]};
 assert.equal(U.workloadCounts(overlapData,'2026-10-17',filters).slots,3,'count scheduled arrangements separately even when their occupied times overlap');
+
+const withoutDdl={...data,tasks:tasks.map(task=>({...task,due:''}))};
+assert.deepEqual(U.workloadCounts(data,'2026-10-17',filters),U.workloadCounts(withoutDdl,'2026-10-17',filters),'DDL must not add a point or increase workload density');
+assert.ok(U.dayEntries(data,'2026-10-17',filters).timed.some(item=>item.kind==='deadline'),'DDL remains visible in the agenda');
+const endWithDdl={...data,tasks:[{...tasks[1],due:'2026-10-25T20:00'}]};
+assert.deepEqual(U.workloadCounts(endWithDdl,'2026-10-25',filters),{slots:0,dated:0,points:1,untimed:1},'planned end plus DDL counts only once');
