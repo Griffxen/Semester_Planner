@@ -45,8 +45,13 @@ def private_state(c,uid):
                 timetable=json.loads((c.execute('SELECT data FROM user_timetable WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0]),
                 user=dict(c.execute('SELECT name,admin,remark FROM users WHERE id=?',(uid,)).fetchone()),
                 settings=dict(c.execute('SELECT name,start FROM settings WHERE user_id=?',(uid,)).fetchone()),
-                tasks=[dict(r) for r in c.execute('SELECT id,title,category,date,end_date,start_time,end_time,due,notes,done,version,milestones,short_title FROM tasks WHERE user_id=?',(uid,))],readonly=False)
-    for task in result['tasks']:task['milestones']=json.loads(task['milestones'])
+                tasks=[dict(r) for r in c.execute('SELECT id,title,category,date,end_date,start_time,end_time,due,notes,done,version,milestones,short_title,deferred,deferred_at,previous_schedule FROM tasks WHERE user_id=?',(uid,))],readonly=False)
+    for task in result['tasks']:
+        task['milestones']=json.loads(task['milestones'])
+        task['previous_schedule']=json.loads(task['previous_schedule'])
+        task['deferred']=bool(task['deferred'])
+    result['deferred_tasks']=sorted((t for t in result['tasks'] if t['deferred']),key=lambda t:(t['deferred_at'],t['id']),reverse=True)
+    result['tasks']=[t for t in result['tasks'] if not t['deferred']]
     result['course_dates']=expand(result['timetable'],result['settings']['start'],result['holidays'],result['course_exceptions'],include_cancelled=True)
     annotations={(r['course_key'],r['date']):dict(r) for r in c.execute('SELECT course_key,date,notes,homework_required,homework_notes,homework_done FROM course_annotations WHERE user_id=?',(uid,))}
     for course in result['course_dates']:

@@ -299,8 +299,7 @@
   M.exportData = () => {
     if (deny()) return;
     const d = M.data;
-    const result = {format: 1, exportedAt: new Date().toISOString(), settings: d.settings, tasks: d.tasks,
-      journal: d.journal, timetable: d.timetable, course_exceptions: d.course_exceptions, holidays: d.holidays};
+    const result = DeferredTasks.backup(d);
     download(new Blob([JSON.stringify(result,null,2)], {type: 'application/json'}), `semester-${today()}.json`);
     M.toast('JSON 备份已导出');
   };

@@ -68,6 +68,7 @@
     const record={type:'root',ui:snapshot(),scroll:0};
     if(replace){records[index]=record;history.replaceState({mobile:session,index},'');activate(index);}else push(record);
   }
+  M.showScheduled = date => {M.goHome();root({tab:'agenda',date},true);};
   M.goHome = () => {confirmation?.finish(false);document.querySelectorAll('#m-pages>.m-page').forEach(p=>{p.dispatchEvent(new CustomEvent('mobile:dispose'));p.remove();});records.splice(0);index=0;session=Math.random().toString(36).slice(2);ui.tab='agenda';records.push({type:'root',ui:snapshot(),scroll:0});history.replaceState({mobile:session,index:0},'');activate(0);};
   M.openPage = function(options) {
     if(saving)return null;
@@ -197,14 +198,15 @@
     $('#m-subtitle').textContent=ui.tab==='agenda'?(date===today()?'今天 · ':'')+M.data.settings.name:ui.tab==='overview'?'从一周到整个学期':'学期手记';
     $('#m-header-actions').innerHTML=ui.tab==='more'?'':`<button data-action="filters" aria-label="筛选" data-icon="filter"></button>${!M.readonly()?'<button data-action="add" class="primary" aria-label="新建任务" data-icon="plus"></button>':''}`;
     $('#m-share-banner').hidden=!M.readonly();$('#m-share-banner').innerHTML=M.readonly()?`${esc(M.data.preview?'分享预览':M.data.share?.busy_only?'仅占用展示':'只读日程')}${M.data.preview?'<button data-action="exit-preview">退出预览</button>':''}`:'';
-    let body=ui.tab==='agenda'?agenda():ui.tab==='more'?more():`<div class="m-segment" role="tablist" aria-label="总览范围"><button role="tab" data-overview="week" aria-selected="${ui.overview==='week'}">本周</button><button role="tab" data-overview="semester" aria-selected="${ui.overview==='semester'}">学期</button></div>`+(M.readonly()&&!M.data.share?.enabled?'<p class="m-empty">分享尚未开启，当前没有获准展示的日程。</p>':ui.overview==='week'?week():semester());
+    if(M.readonly()&&ui.overview==='deferred')ui.overview='week';
+    let body=ui.tab==='agenda'?agenda():ui.tab==='more'?more():`<div class="m-segment" role="tablist" aria-label="总览范围"><button role="tab" data-overview="week" aria-selected="${ui.overview==='week'}">本周</button><button role="tab" data-overview="semester" aria-selected="${ui.overview==='semester'}">学期</button>${!M.readonly()?`<button role="tab" data-overview="deferred" aria-selected="${ui.overview==='deferred'}">暂缓 · ${(M.data.deferred_tasks||[]).length}</button>`:''}</div>`+(M.readonly()&&!M.data.share?.enabled?'<p class="m-empty">分享尚未开启，当前没有获准展示的日程。</p>':ui.overview==='deferred'?`<p class="m-meta">${esc(ui.filters.category||'全部分类')} · ${DeferredTasks.filtered(M.data,ui.filters).length} 项暂缓任务</p>`+DeferredTasks.list(DeferredTasks.filtered(M.data,ui.filters)):ui.overview==='week'?week():semester());
     $('#m-content').innerHTML=body;
     $('#m-nav').querySelectorAll('button').forEach(b=>{b.setAttribute('aria-current',b.dataset.tab===ui.tab?'page':'false');});
     if(records[index]?.type==='root')records[index].ui=snapshot();M.decorate();
   }
   function openFilters() {
-    const filters={...ui.filters},busy=!!M.data.share?.busy_only;
-    M.openPage({title:'筛选日程',body:`<form id="m-filter-form">${busy?'':`<label class="m-field">搜索任务<input name="query" type="search" value="${esc(filters.query)}" placeholder="标题、简称、备注或节点"></label>`}<label class="m-field">任务分类<select name="category"><option value="">全部分类</option>${M.data.categories.map(c=>`<option value="${esc(c.name)}" ${filters.category===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>${busy?'':`<label class="m-check"><input name="hideDone" type="checkbox" ${filters.hideDone?'checked':''}>隐藏已完成任务和节点</label>`}<label class="m-check"><input name="showCourses" type="checkbox" ${filters.showCourses?'checked':''}>显示课程</label><p class="m-muted">搜索和分类只筛选任务，课程按“显示课程”控制。</p></form>`,actions:'<button data-clear>清除筛选</button><button class="primary" data-apply>应用筛选</button>',onMount(page){const form=page.querySelector('form');page.querySelector('[data-clear]').onclick=()=>{ui.filters={category:'',query:'',hideDone:false,showCourses:true};syncRootFilters();M.back({force:true});};page.querySelector('[data-apply]').onclick=()=>{ui.filters={category:form.elements.category.value,query:form.elements.query?.value||'',hideDone:form.elements.hideDone?.checked||false,showCourses:form.elements.showCourses.checked};syncRootFilters();M.back({force:true});};}});
+    const filters={...ui.filters},busy=!!M.data.share?.busy_only,deferredView=ui.tab==='overview'&&ui.overview==='deferred';
+    M.openPage({title:deferredView?'筛选暂缓任务':'筛选日程',body:`<form id="m-filter-form">${busy?'':`<label class="m-field">搜索任务<input name="query" type="search" value="${esc(filters.query)}" placeholder="标题、简称、备注或节点"></label>`}<label class="m-field">任务分类<select name="category"><option value="">全部分类</option>${M.data.categories.map(c=>`<option value="${esc(c.name)}" ${filters.category===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>${busy||deferredView?'':`<label class="m-check"><input name="hideDone" type="checkbox" ${filters.hideDone?'checked':''}>隐藏已完成任务和节点</label>`}${deferredView?'':`<label class="m-check"><input name="showCourses" type="checkbox" ${filters.showCourses?'checked':''}>显示课程</label><p class="m-muted">搜索和分类只筛选任务，课程按“显示课程”控制。</p>`}</form>`,actions:'<button data-clear>清除筛选</button><button class="primary" data-apply>应用筛选</button>',onMount(page){const form=page.querySelector('form');page.querySelector('[data-clear]').onclick=()=>{ui.filters={category:'',query:'',hideDone:false,showCourses:true};syncRootFilters();M.back({force:true});};page.querySelector('[data-apply]').onclick=()=>{ui.filters={category:form.elements.category.value,query:form.elements.query?.value||'',hideDone:form.elements.hideDone?.checked??filters.hideDone,showCourses:form.elements.showCourses?.checked??filters.showCourses};syncRootFilters();M.back({force:true});};}});
   }
   function syncRootFilters(){for(const record of records)if(record.type==='root')record.ui.filters={...ui.filters};renderRoot();}
   function openReminders(){M.openPage({title:'待处理时间点',body:`<p class="m-meta">过去未完成的结束、截止和节点，以及未来 12 小时内的时间点。</p>${reminderRows(taskTimeHints(M.filteredTasks(),Date.now()))}`,onMount(page){page.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>M.openTask(b.dataset.task));}});}
@@ -212,12 +214,14 @@
     if(pending||saving)return;
     const target=event.target.closest('button,a');if(!target)return;
     if(target.dataset.tab){if(target.dataset.tab!==ui.tab)root({tab:target.dataset.tab});return;}
-    if(target.dataset.action){const action=target.dataset.action;if(action==='filters')openFilters();else if(action==='density')WorkloadSettings.openMobile();else if(action==='add')M.editTask(ui.date);else if(action==='today')root({date:today()});else if(action==='reminders')openReminders();else if(action==='exit-preview')M.exitPreview();return;}
+    if(target.dataset.action){const action=target.dataset.action;if(action==='filters')openFilters();else if(action==='density')WorkloadSettings.openMobile();else if(action==='add')M.editTask(ui.date,null,false,{deferred:ui.tab==='overview'&&ui.overview==='deferred'});else if(action==='today')root({date:today()});else if(action==='reminders')openReminders();else if(action==='exit-preview')M.exitPreview();return;}
     if(target.dataset.shift){root({date:add(ui.date,Number(target.dataset.shift))});return;}
     if(target.dataset.weekShift){root({date:add(ui.date,Number(target.dataset.weekShift))});return;}
     if(target.dataset.showDate){root({tab:'agenda',date:target.dataset.showDate});return;}
     if(target.dataset.showWeek){root({tab:'overview',overview:'week',date:target.dataset.showWeek});return;}
     if(target.dataset.overview){root({overview:target.dataset.overview});return;}
+    if(target.dataset.deferredTask){M.openTask(target.dataset.deferredTask);return;}
+    if(target.dataset.resumeDeferred){M.resumeDeferred(target.dataset.resumeDeferred);return;}
     if(target.dataset.task){M.openTask(target.dataset.task,{nodeIndex:target.hasAttribute('data-node-index')?Number(target.dataset.nodeIndex):undefined});return;}
     if(target.hasAttribute('data-course')){if(target.dataset.course)M.openCourse(target.dataset.course,target.dataset.courseDate);else{const course=M.data.course_dates.find(c=>c.date===target.dataset.courseActual&&c.time===target.dataset.courseTime);if(course)M.openPage({title:course.name,body:`<div class="m-card"><p>${esc(course.date+' '+course.time)}</p><p>${esc(course.room||'')}</p><p class="m-meta">只读课程</p></div>`});}return;}
     if(target.dataset.journal){M.openJournal(target.dataset.journal);return;}

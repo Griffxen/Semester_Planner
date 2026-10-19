@@ -19,6 +19,27 @@ def validate_milestones(raw):
         if type(done) is not bool: raise ValueError()
         result.append(dict(label=label.strip(),stop_at=moment[:16]+'+08:00',done=done))
     return sorted(result,key=lambda x:x['stop_at'])
+SCHEDULE_FIELDS = ('date','end_date','start_time','end_time','due')
+
+def validate_schedule(data):
+    date=dt.date.fromisoformat(data['date']).isoformat()
+    end_date=dt.date.fromisoformat(data.get('end_date') or date).isoformat()
+    start_time=data.get('start_time','');end_time=data.get('end_time','');due=data.get('due','')
+    if end_date<date: raise ValueError()
+    if start_time or end_time:
+        if not all(isinstance(x,str) and re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',x) for x in (start_time,end_time)): raise ValueError()
+        if date+'T'+start_time>=end_date+'T'+end_time: raise ValueError('结束时间必须晚于开始时间')
+    elif start_time!='' or end_time!='': raise ValueError()
+    if not isinstance(due,str) or len(due)>16: raise ValueError()
+    if due: dt.datetime.fromisoformat(due)
+    return dict(date=date,end_date=end_date,start_time=start_time,end_time=end_time,due=due)
+
+def validate_previous_schedule(raw):
+    if not isinstance(raw,dict): raise ValueError()
+    if not raw: return {}
+    if set(raw)-set(SCHEDULE_FIELDS)-{'milestones'}: raise ValueError()
+    return dict(**validate_schedule(raw),milestones=validate_milestones(raw.get('milestones',[])))
+
 def connect():
     DB.parent.mkdir(parents=True,exist_ok=True)
     c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; c.execute('PRAGMA foreign_keys=ON'); return c
@@ -51,6 +72,9 @@ def init():
             c.execute("ALTER TABLE tasks ADD COLUMN milestones TEXT NOT NULL DEFAULT '[]'")
         if 'short_title' not in [r['name'] for r in c.execute('PRAGMA table_info(tasks)')]:
             c.execute("ALTER TABLE tasks ADD COLUMN short_title TEXT NOT NULL DEFAULT ''")
+        task_columns={r['name'] for r in c.execute('PRAGMA table_info(tasks)')}
+        for field,definition in [('deferred','INTEGER NOT NULL DEFAULT 0'),('deferred_at',"TEXT NOT NULL DEFAULT ''"),('previous_schedule',"TEXT NOT NULL DEFAULT '{}'")]:
+            if field not in task_columns: c.execute(f'ALTER TABLE tasks ADD COLUMN {field} {definition}')
         if 'admin' not in [r['name'] for r in c.execute('PRAGMA table_info(users)')]:
             c.execute('ALTER TABLE users ADD COLUMN admin INTEGER NOT NULL DEFAULT 0')
             c.execute('UPDATE users SET admin=1 WHERE id=(SELECT min(id) FROM users)')
@@ -107,9 +131,9 @@ class Handler(BaseHTTPRequestHandler):
                 '/legacy':'legacy/index.html', '/legacy/':'legacy/index.html',
                 '/m':'mobile/index.html', '/m/':'mobile/index.html',
                 '/mobile-entry.js':'mobile-entry.js'}
-        for prefix,names in [('',('app.js','style.css','icon.svg','share.js')),
+        for prefix,names in [('',('app.js','style.css','icon.svg','share.js','deferred.js','deferred.css')),
                              ('legacy/',('app.js','style.css','icon.svg','share.js','transition.css')),
-                             ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css')),
+                             ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css','deferred.js')),
                              ('m/',('app.js','domain.js','tasks.js','courses.js','manage.js','style.css'))]:
             assets.update({'/'+prefix+name:('mobile/' if prefix=='m/' else prefix)+name for name in names})
         if method=='GET' and path in assets:
@@ -391,26 +415,43 @@ class Handler(BaseHTTPRequestHandler):
                 if start.weekday()!=0 or not 1<=len(name)<=80: raise ValueError()
                 c.execute('UPDATE settings SET name=?,start=? WHERE user_id=?',(name,start.isoformat(),uid)); self.send(200,{'ok':True}); return
             if path=='/api/tasks' and method=='POST' or path.startswith('/api/tasks/') and method=='PUT':
-                title=str(data['title']).strip(); date=dt.date.fromisoformat(data['date']).isoformat(); due=str(data.get('due','')); category=data.get('category','课程'); notes=str(data.get('notes',''))
-                end_date=dt.date.fromisoformat(data.get('end_date') or date).isoformat()
-                if end_date<date: raise ValueError()
-                start_time=data.get('start_time','');end_time=data.get('end_time','')
-                if start_time or end_time:
-                    if not all(isinstance(x,str) and re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',x) for x in (start_time,end_time)):raise ValueError()
-                    if date+'T'+start_time>=end_date+'T'+end_time:
-                        self.send(400,{'error':'结束时间必须晚于开始时间'});return
-                elif start_time!='' or end_time!='':raise ValueError()
-                if due: dt.datetime.fromisoformat(due)
-                existing=c.execute('SELECT milestones,short_title FROM tasks WHERE id=? AND user_id=?',(path.rsplit('/',1)[1],uid)).fetchone() if method=='PUT' else None
+                existing=c.execute('SELECT * FROM tasks WHERE id=? AND user_id=?',(path.rsplit('/',1)[1],uid)).fetchone() if method=='PUT' else None
+                if method=='PUT' and (not existing or data.get('version')!=existing['version']):
+                    self.send(409,{'error':'任务已被其他页面修改，请刷新后重试'});return
+                deferred=data.get('deferred',bool(existing['deferred']) if existing else False)
+                if type(deferred) is not bool: raise ValueError()
+                title=str(data['title']).strip();category=data.get('category','课程');notes=str(data.get('notes',''))
+                done=bool(data.get('done',False))
+                if deferred and (done or existing and existing['done']): raise ValueError('已完成任务不能暂缓')
                 short_title=data.get('short_title',existing['short_title'] if existing else '')
                 if not isinstance(short_title,str) or len(short_title)>40: raise ValueError()
                 short_title=short_title.strip()
-                milestones=json.dumps(validate_milestones(data.get('milestones',json.loads(existing['milestones']) if existing else [])),ensure_ascii=False)
-                if not 1<=len(title)<=120 or len(notes)>4000 or not c.execute('SELECT 1 FROM categories WHERE user_id=? AND name=?',(uid,category)).fetchone() or len(due)>16: raise ValueError()
-                if method=='POST': c.execute('INSERT INTO tasks(id,user_id,title,category,date,due,notes,done,version,end_date,start_time,end_time,milestones,short_title) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?)',(secrets.token_hex(8),uid,title,category,date,due,notes,int(bool(data.get('done',False))),end_date,start_time,end_time,milestones,short_title))
+                if not 1<=len(title)<=120 or len(notes)>4000 or not c.execute('SELECT 1 FROM categories WHERE user_id=? AND name=?',(uid,category)).fetchone(): raise ValueError()
+                if existing: previous=json.loads(existing['previous_schedule'])
+                else: previous=validate_previous_schedule(data.get('previous_schedule',{})) if deferred else {}
+                deferred_at=existing['deferred_at'] if existing else ''
+                if deferred:
+                    if existing and not existing['deferred']:
+                        previous={k:existing[k] for k in SCHEDULE_FIELDS}
+                        previous['milestones']=json.loads(existing['milestones'])
+                    if not existing or not existing['deferred']:
+                        deferred_at=dt.datetime.now(dt.timezone.utc).isoformat()
+                        if not existing and data.get('deferred_at'):
+                            moment=dt.datetime.fromisoformat(data['deferred_at'])
+                            if moment.tzinfo is None: raise ValueError()
+                            deferred_at=moment.astimezone(dt.timezone.utc).isoformat()
+                    schedule={k:'' for k in SCHEDULE_FIELDS};nodes=[]
                 else:
-                    cur=c.execute('UPDATE tasks SET title=?,category=?,date=?,end_date=?,start_time=?,end_time=?,due=?,notes=?,done=?,milestones=?,short_title=?,version=version+1 WHERE id=? AND user_id=? AND version=?',(title,category,date,end_date,start_time,end_time,due,notes,int(bool(data.get('done',False))),milestones,short_title,path.rsplit('/',1)[1],uid,data['version']))
-                    if cur.rowcount==0: self.send(409,{'error':'任务已被其他页面修改，请刷新后重试'}); return
+                    if existing and existing['deferred'] and not {'due','milestones'}<=data.keys(): raise ValueError('请明确提交新的截止和节点安排')
+                    schedule=validate_schedule(data)
+                    nodes=validate_milestones(data.get('milestones',json.loads(existing['milestones']) if existing else []))
+                    deferred_at=''
+                values=(title,category,schedule['date'],schedule['end_date'],schedule['start_time'],schedule['end_time'],schedule['due'],notes,int(done),json.dumps(nodes,ensure_ascii=False),short_title,int(deferred),deferred_at,json.dumps(previous,ensure_ascii=False))
+                if method=='POST':
+                    c.execute('INSERT INTO tasks(title,category,date,end_date,start_time,end_time,due,notes,done,milestones,short_title,deferred,deferred_at,previous_schedule,id,user_id,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)',values+(secrets.token_hex(8),uid))
+                else:
+                    cur=c.execute('UPDATE tasks SET title=?,category=?,date=?,end_date=?,start_time=?,end_time=?,due=?,notes=?,done=?,milestones=?,short_title=?,deferred=?,deferred_at=?,previous_schedule=?,version=version+1 WHERE id=? AND user_id=? AND version=?',values+(existing['id'],uid,data['version']))
+                    if cur.rowcount==0: self.send(409,{'error':'任务已被其他页面修改，请刷新后重试'});return
                 self.send(200,{'ok':True}); return
             if path.startswith('/api/tasks/') and method=='DELETE':
                 cur=c.execute('DELETE FROM tasks WHERE id=? AND user_id=? AND version=?',(path.rsplit('/',1)[1],uid,data['version']))

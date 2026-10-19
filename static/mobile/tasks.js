@@ -9,7 +9,7 @@
   const localTime = value => String(value || '').slice(0, 16);
   const dateAttrs = 'min="0001-01-01" max="9999-12-31"';
   const momentAttrs = 'min="0001-01-01T00:00" max="9999-12-31T23:59"';
-  const findTask = id => (M.data?.tasks || []).find(task => String(task.id) === String(id));
+  const findTask = id => [...(M.data?.tasks || []),...(M.data?.deferred_tasks || [])].find(task => String(task.id) === String(id));
   const button = (action, label, classes = '') => `<button type="button" class="${classes}" data-action="${action}">${label}</button>`;
   const errorBox = '<p class="m-error" role="alert" data-error data-page-error></p>';
   const option = (value, label, selected) => `<option value="${esc(value)}"${selected ? ' selected' : ''}>${esc(label)}</option>`;
@@ -76,6 +76,9 @@
       result[key] = task[key] || '';
     }
     result.end_date ||= result.date;
+    result.deferred = !!task.deferred;
+    result.deferred_at = task.deferred_at || '';
+    result.previous_schedule = clone(task.previous_schedule || {});
     result.done = !!task.done;
     result.milestones = (task.milestones || []).map(node => ({label: node.label || '', stop_at: node.stop_at, done: !!node.done}));
     if (task.version !== undefined) result.version = task.version;
@@ -154,9 +157,13 @@
           const actions = current.querySelector('.m-page-actions');
           current.querySelector('.m-page-head h1')?.replaceChildren(document.createTextNode(task?.title || '任务详情'));
           current.setAttribute('aria-label', task?.title || '任务详情');
-          if (actions) actions.innerHTML = task && !M.readonly() ? button('toggle', task.done ? '标为未完成' : '标为完成', 'm-primary') + button('edit', '编辑任务') : '';
+          if (actions) actions.innerHTML = task && !M.readonly() ? task.deferred ? button('resume','重新安排','m-primary')+button('edit','编辑任务') : button('toggle', task.done ? '标为未完成' : '标为完成', 'm-primary') + button('edit', '编辑任务') : '';
           if (!task) { host.innerHTML = '<p class="m-empty">这项任务已删除或不再分享。</p>'; return; }
           const ro = M.readonly(), busyOnly = !!M.data.share?.busy_only;
+          if (task.deferred) {
+            host.innerHTML = `<section class="m-section"><h2>${esc(task.title)}</h2><p>${esc(task.category)} · 暂缓</p>${task.short_title?`<p>简称：${esc(task.short_title)}</p>`:''}<p class="m-prewrap">${esc(task.notes || '无备注')}</p>${DeferredTasks.reference(task)}</section><section class="m-section"><div class="m-inline">${button('copy','复制任务')}${button('delete','删除任务','m-danger')}</div></section>`;
+            M.decorate(current); return;
+          }
           host.innerHTML = `<section class="m-section" data-category="${esc(task.category)}"><h2>${esc(task.title)}</h2>
             <p>${esc(U.taskWhen(task, true))}${task.start_time ? '' : ' · 按日期'}</p>
             ${busyOnly ? '' : `<p class="m-muted">${esc(task.category)} · ${task.done ? '已完成' : '待完成'}</p>
@@ -166,7 +173,7 @@
               ${ro ? '' : button('manage-nodes', '管理节点')}</div><div class="m-list">${(task.milestones || []).map((node, index) => `<article class="m-item" data-node-index="${index}"><div><strong>${node.done ? '✓ ' : '◆ '}${esc(node.label || '关键节点')}</strong><p class="m-muted">${esc(localTime(node.stop_at).replace('T', ' '))} · ${node.done ? '已完成' : '未完成'}</p></div>
                 ${ro ? '' : `<div class="m-inline"><button type="button" data-toggle-node="${index}">${node.done ? '标为未完成' : '标为完成'}</button><button type="button" data-edit-node="${index}">编辑</button></div>`}</article>`).join('') || '<p class="m-empty">暂未设置节点</p>'}</div></section>
               <section class="m-section"><h3>备注</h3><p class="m-prewrap">${esc(task.notes || '未填写备注')}</p></section>`}
-            ${ro ? '' : `<section class="m-section"><div class="m-inline">${button('adjust', '调整时间')}${button('copy', '复制任务')}${button('delete', '删除任务', 'm-danger')}</div></section>`}`;
+            ${ro ? '' : `<section class="m-section"><div class="m-inline">${button('adjust', '调整时间')}${!task.done?button('defer','暂缓'):''}${button('copy', '复制任务')}${button('delete', '删除任务', 'm-danger')}</div></section>`}`;
           M.decorate(current);
         };
         render();
@@ -177,7 +184,13 @@
           const task = findTask(id);
           if (!task) return;
           const action = target.dataset.action;
-          if (action === 'edit') openTaskEditor(task.date, id, false);
+          if (action === 'resume') M.resumeDeferred(id);
+          else if (action === 'defer') {
+            if (await write(current, () => M.api('tasks/'+id,'PUT',{...taskPayload(task),deferred:true}), `暂缓「${task.title}」？原安排将保留作参考。`, '确认暂缓')) {
+              await M.back({force:true}); M.toast('任务已暂缓');
+            }
+          }
+          else if (action === 'edit') openTaskEditor(task.date, id, false);
           else if (action === 'copy') openTaskEditor(task.date, id, true);
           else if (action === 'adjust') M.adjustTask(id);
           else if (action === 'manage-nodes') openTaskEditor(task.date, id, false, {showNodes: true});
@@ -252,9 +265,9 @@
   function openDraftExtra(session, kind) {
     const titles={due:'截止时间',notes:'任务备注',other:'简称与完成状态'};
     const initial={...session.extra};let form;
-    const read=()=>kind==='due'?{due:form.elements.due.value}:kind==='notes'?{notes:form.elements.notes.value}:{short_title:form.elements.short_title.value.trim(),done:form.elements.done.checked};
+    const read=()=>kind==='due'?{due:form.elements.due.value}:kind==='notes'?{notes:form.elements.notes.value}:{short_title:form.elements.short_title.value.trim(),done:!session.deferred?.()&&form.elements.done.checked};
     let baseline='';
-    return M.openPage({title:titles[kind],body:`<form class="m-form" data-extra-form novalidate><p class="m-muted">${esc(session.title())} · 修改暂存在任务草稿中</p>${kind==='due'?`<label class="m-field">截止时间（选填，北京时间）<input name="due" type="datetime-local" ${momentAttrs} value="${esc(localTime(initial.due))}"></label><p class="m-muted">留空表示没有独立截止。修改计划区间不会移动此时间。</p>`:kind==='notes'?`<label class="m-field">任务备注<textarea name="notes" maxlength="4000" rows="12">${esc(initial.notes)}</textarea></label>`:`<label class="m-field">简称（选填）<input name="short_title" maxlength="40" value="${esc(initial.short_title)}" placeholder="用于节点显示"></label><label class="m-check"><input type="checkbox" name="done" ${initial.done?'checked':''}>任务已完成</label>`}</form>`,actions:button('apply-extra','应用到任务草稿','m-primary'),dirty:()=>!!form&&JSON.stringify(read())!==baseline,onMount(page){form=page.querySelector('form');baseline=JSON.stringify(read());const apply=async()=>{if(page.dataset.completed||!validate(form))return;Object.assign(session.extra,read());baseline=JSON.stringify(read());session.renderNodes();finishPage(page,'已应用到任务草稿');await M.back({force:true});};page.querySelector('[data-action="apply-extra"]').onclick=apply;form.onsubmit=event=>{event.preventDefault();apply();};}});
+    return M.openPage({title:titles[kind],body:`<form class="m-form" data-extra-form novalidate><p class="m-muted">${esc(session.title())} · 修改暂存在任务草稿中</p>${kind==='due'?`<label class="m-field">截止时间（选填，北京时间）<input name="due" type="datetime-local" ${momentAttrs} value="${esc(localTime(initial.due))}"></label><p class="m-muted">留空表示没有独立截止。修改计划区间不会移动此时间。</p>`:kind==='notes'?`<label class="m-field">任务备注<textarea name="notes" maxlength="4000" rows="12">${esc(initial.notes)}</textarea></label>`:`<label class="m-field">简称（选填）<input name="short_title" maxlength="40" value="${esc(initial.short_title)}" placeholder="用于节点显示"></label><label class="m-check" ${session.deferred?.()?'hidden':''}><input type="checkbox" name="done" ${initial.done?'checked':''}>任务已完成</label>`}</form>`,actions:button('apply-extra','应用到任务草稿','m-primary'),dirty:()=>!!form&&JSON.stringify(read())!==baseline,onMount(page){form=page.querySelector('form');baseline=JSON.stringify(read());const apply=async()=>{if(page.dataset.completed||!validate(form))return;Object.assign(session.extra,read());baseline=JSON.stringify(read());session.renderNodes();finishPage(page,'已应用到任务草稿');await M.back({force:true});};page.querySelector('[data-action="apply-extra"]').onclick=apply;form.onsubmit=event=>{event.preventDefault();apply();};}});
   }
 
   function openDraftNodes(session) {
@@ -269,16 +282,20 @@
       title: '', short_title: '', category: M.data.categories?.[0]?.name || '', date: date || U.today(),
       end_date: date || U.today(), start_time: '', end_time: '', due: '', notes: '', done: false, milestones: []
     };
-    if (copy) { delete initial.version; initial.done = false; initial.milestones = initial.milestones.map(node => ({...node, done: false})); }
+    if (options.reschedule) Object.assign(initial,DeferredTasks.blank(initial));
+    if (!source && options.deferred) initial.deferred = true;
+    if (copy) { delete initial.version; delete initial.deferred_at; initial.done = false; initial.milestones = initial.milestones.map(node => ({...node, done: false})); }
     const editingId = copy ? null : id;
     const session = {nodes: clone(initial.milestones), extra:{due:initial.due,short_title:initial.short_title,notes:initial.notes,done:initial.done},title: () => initial.title || '新建任务', renderNodes() {}};
     let baseline = '', read = () => initial;
     const page = M.openPage({
-      title: copy ? '复制任务' : editingId ? '编辑任务' : '新建任务',
+      title: options.reschedule ? '重新安排任务' : copy ? '复制任务' : editingId ? '编辑任务' : '新建任务',
       body: `<form class="m-form" data-task-form novalidate>
         <section class="m-section"><label class="m-field">任务名称<input name="title" maxlength="120" required value="${esc(initial.title)}" placeholder="想完成什么？"></label>
           <label class="m-field">分类<select name="category" required>${(M.data.categories || []).map(category => option(category.name, category.name, category.name === initial.category)).join('')}</select></label>
-          ${scheduleFields(initial)}<p class="m-muted">北京时间 · 计划区间与截止时间相互独立</p></section>
+          <label class="m-field" ${options.reschedule||initial.done?'hidden':''}>任务状态<select name="deferred">${option('false','正常安排',!initial.deferred)}${option('true','暂缓',!!initial.deferred)}</select></label>
+          <div data-schedule-fields>${scheduleFields(initial)}<p class="m-muted">北京时间 · 计划区间与截止时间相互独立</p></div></section>
+        ${source?.deferred?DeferredTasks.reference(source)+(options.reschedule&&source.previous_schedule?.date?'<button type="button" data-use-previous>带入原安排</button>':''):''}
         <section class="m-section m-setting-list"><button type="button" class="m-setting-row" data-extra="due"><span>截止时间</span><span class="m-meta" data-due-summary></span><span>›</span></button>
           <button type="button" class="m-setting-row" data-extra="notes"><span>备注</span><span class="m-meta" data-notes-summary></span><span>›</span></button>
           <button type="button" class="m-setting-row" data-extra="other"><span>简称与状态</span><span class="m-meta" data-other-summary></span><span>›</span></button>
@@ -294,18 +311,39 @@
           Object.assign(draft,session.extra);
           draft.title = draft.title.trim(); draft.short_title = draft.short_title.trim();
           draft.milestones = clone(session.nodes);
+          draft.deferred = form.elements.deferred.value === 'true';
+          if (draft.deferred) Object.assign(draft,{date:'',end_date:'',start_time:'',end_time:'',due:'',milestones:[],done:false});
           return draft;
         };
+        session.deferred = () => form.elements.deferred.value === 'true';
         const conflicts = () => { current.querySelector('[data-task-conflicts]').innerHTML = conflictNote(conflictNames(read(), editingId)); };
         bindSchedule(form, conflicts);
+        const syncDeferred = () => {
+          const deferred = form.elements.deferred.value === 'true';
+          form.querySelector('[data-schedule-fields]').hidden = deferred;
+          form.querySelector('[data-schedule-fields]').querySelectorAll('input,select').forEach(field => {field.disabled = deferred;});
+          if (!deferred) form.elements.schedule_mode.dispatchEvent(new Event('change'));
+          for (const target of current.querySelectorAll('[data-extra="due"],[data-manage-draft-nodes]')) target.hidden = deferred;
+          conflicts(); session.renderNodes();
+        };
+        form.elements.deferred.onchange = syncDeferred;
+        syncDeferred();
+
         session.title = () => form.elements.title.value.trim() || '新建任务';
         session.renderNodes = () => {
           current.querySelector('[data-node-count]').textContent = session.nodes.length+' 个节点';
           current.querySelector('[data-due-summary]').textContent=session.extra.due?localTime(session.extra.due).replace('T',' '):'未设置';
           current.querySelector('[data-notes-summary]').textContent=session.extra.notes?session.extra.notes.length+' 字':'未填写';
-          current.querySelector('[data-other-summary]').textContent=(session.extra.short_title||'未设置简称')+' · '+(session.extra.done?'已完成':'待完成');
+          current.querySelector('[data-other-summary]').textContent=(session.extra.short_title||'未设置简称')+' · '+(session.deferred()?'暂缓':session.extra.done?'已完成':'待完成');
         };
         session.renderNodes();
+        current.querySelector('[data-use-previous]')?.addEventListener('click', () => {
+          const previous = clone(source.previous_schedule);
+          for (const name of ['date','end_date','start_time','end_time']) form.elements[name].value = previous[name] || '';
+          form.elements.schedule_mode.value = previous.start_time ? 'minute' : 'date';
+          session.extra.due = previous.due || ''; session.nodes = previous.milestones || [];
+          form.elements.schedule_mode.dispatchEvent(new Event('change')); session.renderNodes();
+        });
         baseline = JSON.stringify(read());
         form.addEventListener('input', () => { form.elements.title.setCustomValidity(''); conflicts(); });
         form.addEventListener('change', conflicts);
@@ -315,13 +353,14 @@
           if (pendingPages.has(current) || current.dataset.completed) return;
           const draft = read();
           form.elements.title.setCustomValidity(draft.title ? '' : '请填写任务名称');
-          if (!validSchedule(form, draft, current)) return;
+          if (draft.deferred ? !validate(form) : !validSchedule(form, draft, current)) return;
           const names = conflictNames(draft, editingId);
-          const message = `${editingId ? '保存' : '创建'}「${draft.title}」？\n计划 ${U.taskWhen(draft, true)}\n${draft.due?'截止 '+draft.due.replace('T',' '):'未设置独立截止'} · ${draft.milestones.length} 个节点${names.length ? '\n与 ' + names.slice(0, 5).join('、') + ' 重叠，仍然保存。' : ''}`;
+          const message = draft.deferred ? `${editingId?'保存':'创建'}暂缓任务「${draft.title}」？` : `${editingId ? '保存' : '创建'}「${draft.title}」？\n计划 ${U.taskWhen(draft, true)}\n${draft.due?'截止 '+draft.due.replace('T',' '):'未设置独立截止'} · ${draft.milestones.length} 个节点${names.length ? '\n与 ' + names.slice(0, 5).join('、') + ' 重叠，仍然保存。' : ''}`;
           if (await write(current, () => M.api(editingId ? 'tasks/' + editingId : 'tasks', editingId ? 'PUT' : 'POST', draft), message, editingId ? '保存修改' : '创建任务')) {
             baseline = JSON.stringify(read());
             finishPage(current, editingId ? '任务已保存' : '任务已创建');
             await M.back({force: true});
+            if (options.reschedule || source?.deferred && !draft.deferred) M.showScheduled(draft.date);
             M.toast(editingId ? '任务已保存' : '任务已创建');
           }
         };
@@ -334,12 +373,14 @@
     return page;
   }
 
-  M.editTask = (date, id = null, copy = false) => openTaskEditor(date, id, copy);
+  M.editTask = (date, id = null, copy = false, options = {}) => openTaskEditor(date, id, copy, options);
+  M.resumeDeferred = id => openTaskEditor('', id, false, {reschedule:true});
 
   M.adjustTask = function (id) {
     if (!requireWritable()) return;
     const task = findTask(id);
     if (!task) { M.toast('这项任务已不存在，请刷新日程'); return; }
+    if (task.deferred) return M.resumeDeferred(id);
     const initial = taskPayload(task);
     let baseline = '', read = () => initial;
     return M.openPage({
