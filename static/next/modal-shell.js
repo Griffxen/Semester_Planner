@@ -24,8 +24,8 @@
       const button = frame.view.querySelector('.dialog-head > button,.task-conflict-head [data-close],:scope > header button');
       if (button) {
         const back = frames.indexOf(frame) > 0;
-        const label = back ? '返回上一页' : '退出窗口';
-        button.innerHTML = '<svg class="modal-navigation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(back?'<path d="m12 5-7 7 7 7M5 12h14"/>':'<path d="M9 5H5v14h4M9 12h11m-4-4 4 4-4 4"/>')+'</svg>';
+        const label = back ? '返回上一页' : '关闭窗口';
+        button.innerHTML = back ? '<svg class="modal-navigation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg>' : '<span aria-hidden="true">×</span>';
         button.setAttribute('aria-label', label); button.title = label;
       }
       const title = frame.view.querySelector('h1,h2,h3');
