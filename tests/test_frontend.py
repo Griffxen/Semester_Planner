@@ -40,6 +40,9 @@ class Frontend(unittest.TestCase):
                             ('/export.js', 'text/javascript'),
                             ('/export.css', 'text/css'),
                             ('/deferred.js', 'text/javascript'),
+                            ('/app.js', 'text/javascript'),
+                            ('/task-conflicts.js', 'text/javascript'),
+                            ('/task-conflicts.css', 'text/css'),
                             ('/deferred.css', 'text/css'),
                             ('/next/deferred.js', 'text/javascript'),
                             ('/next/export-entry.js', 'text/javascript'),
@@ -57,7 +60,9 @@ class Frontend(unittest.TestCase):
         with urllib.request.urlopen(self.url + '/next/') as res:
             html = res.read().decode()
             self.assertIn('href="/legacy/"', html)
-            self.assertIn('/legacy/app.js', html)
+            self.assertIn('/app.js', html)
+            self.assertIn('/task-conflicts.js', html)
+            self.assertLess(html.index('/task-conflicts.js'), html.index('/app.js'))
         with urllib.request.urlopen(self.url + '/') as res:
             self.assertEqual(res.read(), (app.ROOT / 'static/next/index.html').read_bytes())
 
@@ -82,7 +87,8 @@ class Frontend(unittest.TestCase):
         self.assertNotIn('<script>', html)
         self.assertIn('viewport-fit=cover', html)
         self.assertLess(html.index('/m/app.js'), html.index('/m/tasks.js'))
+        self.assertLess(html.index('/task-conflicts.js'), html.index('/m/app.js'))
         for tab in ('agenda', 'overview', 'more'):
             self.assertIn('data-tab="' + tab + '"', html)
         desktop = (app.ROOT / 'static/next/index.html').read_text()
-        self.assertLess(desktop.index('/mobile-entry.js'), desktop.index('/legacy/app.js'))
+        self.assertLess(desktop.index('/mobile-entry.js'), desktop.index('/app.js'))

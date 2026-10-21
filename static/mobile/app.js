@@ -16,13 +16,14 @@
   M.exportFilterLabel = () => [ui.filters.category||'全部分类',ui.filters.query?'搜索：'+ui.filters.query:'',ui.filters.hideDone?'隐藏已完成':'',ui.filters.showCourses?'含课程':'隐藏课程'].filter(Boolean).join(' · ');
   M.exportOptions = () => ({hideDone:ui.filters.hideDone,label:M.exportFilterLabel()});
   M.readonly = () => !!M.data?.readonly;
-  M.api = async function(path,method='GET',payload) {
+  M.api = (path,method='GET',payload) => TaskConflicts.request(apiRequest,path,method,payload);
+  async function apiRequest(path,method='GET',payload) {
     const url=path.startsWith('/api/')?path:'/api/'+path.replace(/^\//,'');
     let response;
     try { response=await fetch(url,{method,credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':M.data?.csrf||''},body:payload===undefined?undefined:JSON.stringify(payload)}); }
     catch(error){throw Object.assign(new Error('连接失败，请重试。当前输入仍保留。'),{status:0});}
     const result=await response.json();
-    if(!response.ok){const error=Object.assign(new Error(result.error||'读取失败，请重试'),{status:response.status});if(response.status===401&&url!=='/api/login')showLogin(error.message);throw error;}
+    if(!response.ok){const error=Object.assign(new Error(result.error||'读取失败，请重试'),{status:response.status,code:result.code});if(response.status===401&&url!=='/api/login')showLogin(error.message);throw error;}
     return result;
   };
   M.error = (page,error) => {const host=page?.querySelector('[data-error]');if(host){host.textContent=error.message||String(error);host.hidden=false;host.scrollIntoView({block:'nearest'});}else M.toast(error.message||String(error));};
@@ -140,7 +141,7 @@
       if(result?.reauth){M.goHome();M.data=null;M.previewId=null;showLogin('密码已更新，请重新登录。');return true;}
       try{await M.reload();}catch(error){M.toast('已提交，但重新读取失败；请刷新核对后再操作。');return true;}
       M.toast('已保存');return true;
-    }catch(error){M.error(page,error);return false;}
+    }catch(error){if(!error.cancelled)M.error(page,error);return false;}
     finally{lockRoot.inert=wasInert;saving=false;pending=false;document.body.classList.remove('m-saving');}
   };
 

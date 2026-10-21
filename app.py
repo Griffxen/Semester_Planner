@@ -132,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
                 '/legacy':'legacy/index.html', '/legacy/':'legacy/index.html',
                 '/m':'mobile/index.html', '/m/':'mobile/index.html',
                 '/mobile-entry.js':'mobile-entry.js'}
-        for prefix,names in [('',('app.js','style.css','icon.svg','share.js','export.js','export.css','deferred.js','deferred.css')),
+        for prefix,names in [('',('app.js','style.css','icon.svg','share.js','export.js','export.css','deferred.js','deferred.css','task-conflicts.js','task-conflicts.css')),
                              ('legacy/',('app.js','style.css','icon.svg','share.js','transition.css')),
                              ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css','export-entry.js','deferred.js')),
                              ('m/',('app.js','domain.js','tasks.js','courses.js','manage.js','style.css','export-entry.js'))]:
@@ -430,6 +430,7 @@ class Handler(BaseHTTPRequestHandler):
                 existing=c.execute('SELECT * FROM tasks WHERE id=? AND user_id=?',(path.rsplit('/',1)[1],uid)).fetchone() if method=='PUT' else None
                 if method=='PUT' and (not existing or data.get('version')!=existing['version']):
                     self.send(409,{'error':'任务已被其他页面修改，请刷新后重试'});return
+                if type(data.get('force_complete',False)) is not bool: raise ValueError()
                 deferred=data.get('deferred',bool(existing['deferred']) if existing else False)
                 if type(deferred) is not bool: raise ValueError()
                 title=str(data['title']).strip();category=data.get('category','课程');notes=str(data.get('notes',''))
@@ -458,6 +459,10 @@ class Handler(BaseHTTPRequestHandler):
                     schedule=validate_schedule(data)
                     nodes=validate_milestones(data.get('milestones',json.loads(existing['milestones']) if existing else []))
                     deferred_at=''
+                if existing and not existing['done'] and done and not data.get('force_complete',False):
+                    unfinished=sum(not node['done'] for node in nodes)
+                    if unfinished:
+                        self.send(409,{'code':'unfinished_milestones','error':f'任务仍有 {unfinished} 个未完成节点。强制完成只结束任务，节点保留原状态。'});return
                 values=(title,category,schedule['date'],schedule['end_date'],schedule['start_time'],schedule['end_time'],schedule['due'],notes,int(done),json.dumps(nodes,ensure_ascii=False),short_title,int(deferred),deferred_at,json.dumps(previous,ensure_ascii=False))
                 if method=='POST':
                     c.execute('INSERT INTO tasks(title,category,date,end_date,start_time,end_time,due,notes,done,milestones,short_title,deferred,deferred_at,previous_schedule,id,user_id,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)',values+(secrets.token_hex(8),uid))
@@ -466,6 +471,12 @@ class Handler(BaseHTTPRequestHandler):
                     if cur.rowcount==0: self.send(409,{'error':'任务已被其他页面修改，请刷新后重试'});return
                 self.send(200,{'ok':True}); return
             if path.startswith('/api/tasks/') and method=='DELETE':
+                existing=c.execute('SELECT * FROM tasks WHERE id=? AND user_id=?',(path.rsplit('/',1)[1],uid)).fetchone()
+                if not existing or data.get('version')!=existing['version']:
+                    self.send(409,{'error':'任务已变化，请刷新'});return
+                if type(data.get('force_delete',False)) is not bool: raise ValueError()
+                if not existing['deferred'] and not data.get('force_delete',False):
+                    self.send(409,{'code':'task_not_deferred','error':'任务尚未暂缓，删除存在冲突。强制删除将直接删除任务及其节点，删除后可使用撤销恢复。'});return
                 cur=c.execute('DELETE FROM tasks WHERE id=? AND user_id=? AND version=?',(path.rsplit('/',1)[1],uid,data['version']))
                 self.send(200 if cur.rowcount else 409,{'ok':True} if cur.rowcount else {'error':'任务已变化，请刷新'}); return
             self.send(404,{'error':'未找到'})
