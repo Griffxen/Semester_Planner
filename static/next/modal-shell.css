@@ -7,6 +7,8 @@ html.modal-shell-open{overflow:hidden}
 .next-ui #modal-shell #task-dialog,.next-ui #modal-shell #task-details,.next-ui #modal-shell #sharing-dialog,.next-ui #modal-shell #timetable-dialog,.next-ui #modal-shell #course-details,.next-ui #modal-shell #node-editor-dialog,.next-ui #modal-shell #account-dialog{overflow:hidden}
 .next-ui #modal-shell .modal-view>.dialog-head{flex-shrink:0}
 .next-ui #modal-shell .modal-navigation-icon{display:block;width:20px;height:20px;flex:none}
+.next-ui #modal-shell button.modal-navigation-button,.next-ui #modal-shell button.modal-navigation-button:hover,.next-ui #modal-shell button.modal-navigation-button:active{display:inline-flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;min-width:32px;min-height:32px;padding:4px;border:0;border-radius:0;background:transparent;box-shadow:none;font-size:24px;line-height:1;color:var(--muted)}
+.next-ui #modal-shell button.modal-navigation-button:hover{color:var(--ink)}
 .next-ui #modal-shell,.next-ui #modal-shell *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 48%,transparent) transparent}
 .next-ui #modal-shell ::-webkit-scrollbar{width:6px;height:6px}
 .next-ui #modal-shell ::-webkit-scrollbar-track{background:transparent}

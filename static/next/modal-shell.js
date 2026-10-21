@@ -23,6 +23,7 @@
     function navigation(frame) {
       const button = frame.view.querySelector('.dialog-head > button,.task-conflict-head [data-close],:scope > header button');
       if (button) {
+        button.classList.add('modal-navigation-button');
         const back = frames.indexOf(frame) > 0;
         const label = back ? '返回上一页' : '关闭窗口';
         button.innerHTML = back ? '<svg class="modal-navigation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg>' : '<span aria-hidden="true">×</span>';
