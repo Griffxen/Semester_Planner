@@ -31,6 +31,10 @@ class Frontend(unittest.TestCase):
                             ('/next/icons.js', 'text/javascript'),
                             ('/next/hints.js', 'text/javascript'),
                             ('/next/theme.js', 'text/javascript'),
+                            ('/next/modal-shell.js', 'text/javascript'),
+                            ('/next/modal-shell.css', 'text/css'),
+                            ('/next/dialog-effects.js', 'text/javascript'),
+                            ('/next/dialog-effects.css', 'text/css'),
                             ('/next/paint.css', 'text/css'),
                             ('/next/style.css', 'text/css'),
                             ('/next/workload.js', 'text/javascript'),
@@ -63,6 +67,7 @@ class Frontend(unittest.TestCase):
             self.assertIn('/app.js', html)
             self.assertIn('/task-conflicts.js', html)
             self.assertLess(html.index('/task-conflicts.js'), html.index('/app.js'))
+            self.assertLess(html.index('/next/modal-shell.js'), html.index('/next/app.js'))
         with urllib.request.urlopen(self.url + '/') as res:
             self.assertEqual(res.read(), (app.ROOT / 'static/next/index.html').read_bytes())
 

@@ -58,7 +58,7 @@ const oldTaskDetails=showTaskDetails;showTaskDetails=function(id){oldTaskDetails
 // Keep confirmation context outside the layout while retaining the original slider.
 askConfirm=async function(message,label='确认操作'){
   if(confirmationPending)return false;
-  const modal=[...document.querySelectorAll('dialog[open]')].at(-1),host=modal||document.body;
+  const modal=window.DesktopModal?.currentView()||null,host=modal||document.body;
   if(!lastActionButton?.getClientRects().length||(modal&&!modal.contains(lastActionButton)))lastActionButton=[...(modal||document).querySelectorAll('button')].find(b=>b.matches('.primary')&&b.getClientRects().length)||[...(modal||document).querySelectorAll('button')].find(b=>b.getClientRects().length);
   const bar=document.createElement('div');bar.className='confirm-context-bar';bar.setAttribute('role','status');
   const text=document.createElement('span');text.className='confirm-context-text';text.textContent=message;text.title=message+' · 向右滑动确认，Esc 取消';bar.append(text);host.append(bar);
@@ -80,10 +80,10 @@ function updateAccountTabs(){accountTabs.hidden=['create','reset'].includes(acco
 const oldAccountAction=updateAccountAction;updateAccountAction=function(){oldAccountAction();accountForm.elements.current_password.required=false;accountForm.elements.current_password.closest('label').hidden=true;updateAccountTabs();const action=accountForm.elements.action.value;$('#account-dialog h2').textContent=['create','reset'].includes(action)?'账户管理':'账户设置';};
 accountTabs.onclick=async e=>{const b=e.target.closest('[data-account-tab]');if(!b||accountBusy)return;if([...accountForm.querySelectorAll('input')].some(x=>x.value)){lastActionButton=b;if(!await askConfirm('切换操作并放弃当前输入？'))return}accountForm.reset();accountForm.elements.action.value=b.dataset.accountTab;updateAccountAction();$('#account-error').textContent=''};
 // Personal profile remains an immediate peer entry, rather than an action dropdown.
-const profileTab=document.createElement('button');profileTab.type='button';profileTab.textContent='个人资料';profileTab.className='profile-tab';accountTabs.before(profileTab);profileTab.onclick=()=>{if(accountBusy)return;closeAccount().then(()=>{if(!$('#account-dialog').open)$('#profile-button').click()})};
+const profileTab=document.createElement('button');profileTab.type='button';profileTab.textContent='个人资料';profileTab.className='profile-tab';accountTabs.before(profileTab);profileTab.onclick=async()=>{if(accountBusy)return;if([...accountForm.querySelectorAll('input')].some(input=>input.value)&&!await askConfirm('放弃当前输入？'))return;accountForm.reset();desktopModal.replace(()=>$('#profile-button').click())};
 // Authentication has its own window; server-side verification remains unchanged.
 const authDialog=document.createElement('dialog');authDialog.id='identity-dialog';authDialog.innerHTML=`<form id="identity-form"><div class="dialog-head"><h2>验证身份</h2><button type="button" data-auth-cancel aria-label="取消验证">×</button></div><div class="auth-brand">${uiIcon('lock')}<span>确认由你本人执行此操作</span></div><p class="auth-context" id="identity-context"></p><label>当前账户密码<input name="password" type="password" autocomplete="current-password" required></label><div class="dialog-actions"><button type="button" data-auth-cancel>返回编辑</button><button class="primary">验证并提交</button></div></form>`;document.body.append(authDialog);
-async function identityPassword(context){if(authPending)throw Error('已有身份验证正在进行');authPending=true;const suspended=[...document.querySelectorAll('dialog[open]')];suspended.forEach(d=>d.close());$('#identity-context').textContent=context;const form=$('#identity-form');form.reset();return new Promise((resolve,reject)=>{let ended=false;function finish(password){if(ended)return;ended=true;form.reset();authDialog.close();suspended.forEach(d=>d.showModal());authPending=false;if(password)resolve(password);else reject(Error('已取消身份验证，修改尚未提交'))}form.onsubmit=e=>{e.preventDefault();if(form.reportValidity())finish(form.elements.password.value)};authDialog.querySelectorAll('[data-auth-cancel]').forEach(b=>b.onclick=()=>finish(null));authDialog.oncancel=e=>{e.preventDefault();finish(null)};authDialog.showModal();form.elements.password.focus()})}
+async function identityPassword(context){if(authPending)throw Error('已有身份验证正在进行');authPending=true;$('#identity-context').textContent=context;const form=$('#identity-form');form.reset();return new Promise((resolve,reject)=>{let ended=false;function finish(password){if(ended)return;ended=true;form.reset();authDialog.close();authPending=false;if(password)resolve(password);else reject(Error('已取消身份验证，修改尚未提交'))}form.onsubmit=e=>{e.preventDefault();if(form.reportValidity())finish(form.elements.password.value)};authDialog.querySelectorAll('[data-auth-cancel]').forEach(b=>b.onclick=()=>finish(null));authDialog.oncancel=e=>{e.preventDefault();finish(null)};authDialog.showModal();form.elements.password.focus()})}
 api=async function(path,method='GET',data){const gated=method!=='GET'&&['username','password','users','shares','dashboard-token'].includes(path)&&!(path==='shares'&&method==='PUT');if(!gated)return legacyApi(path,method,data);const context=path==='username'?'修改用户名为「'+data.name+'」':path==='password'?'修改当前账户密码，所有设备将退出登录':path==='dashboard-token'?(data.action==='rotate'?'生成新凭据并撤销旧凭据':'撤销 Dashboard 凭据'):path==='users'?(data.action==='create'?'创建账户「'+data.name+'」':'重置「'+data.name+'」的密码'):'执行展示账户管理操作';let password=await identityPassword(context);try{return await legacyApi(path,method,{...data,current_password:password})}finally{password='';if(data&&'current_password' in data)data.current_password=''}};
 for(const input of document.querySelectorAll('#share-admin-form [name=current_password],#dashboard-token-secret')){input.required=false;input.closest('label').hidden=true}
 changeDashboardToken=async function(action){if(!selectedShare||shareBusy)return;if(policyDirty()){$('#sharing-error').textContent='请先保存分享设置，再管理接入凭据';return}lastActionButton=$('#dashboard-token-'+action);if(!await askConfirm(action==='rotate'?'生成新凭据并立即撤销旧凭据？':'撤销此展示账户的接入凭据？'))return;shareBusy=true;try{const result=await api('dashboard-token','POST',{id:selectedShare.id,action});$('#dashboard-token-value').value=result.token||'';selectedShare.dashboard_token_enabled=!!result.token;$('#dashboard-token-status').textContent=result.token?'新凭据只显示一次，请立即保存。':'接入凭据已撤销。'}catch(e){$('#sharing-error').textContent=e.message}finally{shareBusy=false}};
@@ -96,7 +96,7 @@ const oldOpenTask=openTask;openTask=function(date,id,edit=false){optional.open=!
 const oldSetTheme=setTheme;setTheme=function(theme,persist=true){oldSetTheme(theme,persist);if($('#theme-toggle'))$('#theme-toggle').innerHTML=uiIcon('sun')+(theme==='dark'?'浅色外观':'深色外观')};setTheme(storedTheme()||systemTheme(),false);
 decorateIcons();setToolbarHeight();if(state)render();
 
-const createAccountButton=document.createElement('button');createAccountButton.type='button';createAccountButton.textContent='创建普通账户';createAccountButton.className='primary';$('#accounts-search').closest('label').after(createAccountButton);createAccountButton.onclick=()=>{$('#accounts-dialog').close();$('#account-button').click();accountForm.elements.action.value='create';updateAccountAction()};
+const createAccountButton=document.createElement('button');createAccountButton.type='button';createAccountButton.textContent='创建普通账户';createAccountButton.className='primary';$('#accounts-search').closest('label').after(createAccountButton);createAccountButton.onclick=()=>{$('#account-button').click();accountForm.elements.action.value='create';updateAccountAction()};
 
 const oldAccountSubmit=accountForm.onsubmit;accountForm.onsubmit=async e=>{e.preventDefault();if(accountBusy)return;if(!accountForm.reportValidity())return;lastActionButton=accountForm.querySelector('.primary');if(accountForm.elements.action.value!=='reset'&&!await askConfirm('确认提交此账户修改？接下来需验证身份。'))return;return oldAccountSubmit(e)};
 // Courses: inspect your timetable, the public template, or adjustments at one depth.
@@ -114,7 +114,7 @@ if(state)render();
 const utilityDialog=document.createElement('dialog');utilityDialog.id='utility-dialog';utilityDialog.innerHTML='<div class="dialog-head"><h2>设置与导出</h2><button type="button" id="utility-close" aria-label="关闭设置">×</button></div><div class="detail-tabs" role="tablist" aria-label="设置与导出"><button role="tab" data-utility-tab="settings">设置</button><button role="tab" data-utility-tab="export">导出</button></div>';document.body.append(utilityDialog);const utilities=document.querySelector('.side-bottom');utilityDialog.append(utilities);const utilityGroups=[...utilities.querySelectorAll(':scope > details')];let utilityTab='settings';
 function selectUtility(tab){utilityTab=tab;utilityGroups.forEach((group,i)=>{group.open=true;group.hidden=i!==(tab==='settings'?0:1);group.querySelector('summary').hidden=true});utilityDialog.querySelectorAll('[data-utility-tab]').forEach(b=>{const active=b.dataset.utilityTab===tab;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active))})}
 $('#mobile-more').innerHTML=uiIcon('settings')+'设置与导出';$('#mobile-more').setAttribute('data-icon','settings');$('#mobile-more').onclick=()=>{selectUtility('settings');$('#mobile-more').setAttribute('aria-expanded','true');utilityDialog.showModal()};$('#utility-close').onclick=()=>utilityDialog.close();utilityDialog.addEventListener('close',()=>$('#mobile-more').setAttribute('aria-expanded','false'));utilityDialog.querySelector('.detail-tabs').onclick=e=>{const b=e.target.closest('[data-utility-tab]');if(b)selectUtility(b.dataset.utilityTab)};
-utilities.addEventListener('click',e=>{const button=e.target.closest('button');if(button&&['settings-button','account-button','accounts-button'].includes(button.id))utilityDialog.close()},true);
+// Settings stay mounted behind their child pages.
 // Categories tint a neutral surface; the calendar itself does not carry category color.
 function blendSurface(color,base,amount){const parse=hex=>hex.replace('#','').match(/../g).map(x=>parseInt(x,16)),a=parse(color),b=parse(base);return '#'+a.map((v,i)=>Math.round(v*amount+b[i]*(1-amount)).toString(16).padStart(2,'0')).join('')}
 applyCategoryColors=function(){if(!state)return;const dark=document.documentElement.dataset.theme==='dark',base=dark?'#23342b':'#ffffff',ink=dark?'#e1ebe3':'#293e35';state.categories.forEach((c,i)=>document.querySelectorAll('.cat-'+i).forEach(el=>{const dot=el.classList.contains('dot');el.style.backgroundColor=dot?c.color:blendSurface(c.color,base,dark?.13:.065);el.style.color=ink;el.style.borderColor=dark?tint(c.color,.18):c.color}))};
@@ -180,44 +180,21 @@ $('#share-admin-form').onsubmit=async e=>{
 };
 // Only calendar weeks and the short category list retain native disclosure controls.
 const categoryDisclosure=$('#category-section'),categoryContainer=document.createElement('section');categoryContainer.id='category-section';while(categoryDisclosure.firstChild){const child=categoryDisclosure.firstChild;if(child.tagName==='SUMMARY'){const h=document.createElement('div');h.className='side-caption';h.textContent=child.textContent;categoryContainer.append(h);child.remove()}else categoryContainer.append(child)}categoryDisclosure.replaceWith(categoryContainer);
-// Modal navigation behaves as a stack. Closing a child restores its immediate parent
-// without re-running its opener, so tab selection, scroll position and drafts survive.
-const nativeModalOpen=HTMLDialogElement.prototype.showModal,nativeModalClose=HTMLDialogElement.prototype.close,modalParents=new WeakMap(),modalCancelBound=new WeakSet();let pendingModal=null;
-function bindModalCancel(dialog) {
-  if (modalCancelBound.has(dialog)) return;
-  modalCancelBound.add(dialog);
-  // Registered after the existing form-specific guards, on the dialog itself.
-  dialog.addEventListener('cancel', event => {
-    if (!event.defaultPrevented && !authPending) { event.preventDefault(); dialog.close(); }
-  });
+// The outer modal stays open while existing dialog objects act as internal pages.
+function modalViewStamp(dialog){
+  if(!state)return null;
+  if(['task-details','deferred-details'].includes(dialog.id)){
+    const task=[...state.tasks,...(state.deferred_tasks||[])].find(t=>t.id===dialog.dataset.taskId);
+    return task?String(task.version):'missing';
+  }
+  if(dialog.id==='course-details')return JSON.stringify(state.course_dates?.find(c=>c.course_key===dialog.dataset.courseKey&&c.original_date===dialog.dataset.courseDate)||null);
+  return null;
 }
-HTMLDialogElement.prototype.showModal=function(){
-  bindModalCancel(this);
-  if(authPending||this.id==='identity-dialog')return nativeModalOpen.call(this);
-  if(this.open)return;
-  const transition=pendingModal;
-  let parent=transition?.dialog;
-  pendingModal=null;
-  if(!parent)parent=[...document.querySelectorAll('dialog[open]')].at(-1);
-  if(parent&&parent!==this){modalParents.set(this,{dialog:parent,focus:transition?.focus||document.activeElement});if(parent.open)nativeModalClose.call(parent)}
-  return nativeModalOpen.call(this);
-};
-HTMLDialogElement.prototype.close=function(value){
-  if(!this.open)return;
-  if(authPending||this.id==='identity-dialog')return nativeModalClose.call(this,value);
-  const pending={dialog:this,focus:document.activeElement};
-  nativeModalClose.call(this,value);pendingModal=pending;
-  setTimeout(()=>{
-    if(pendingModal!==pending)return;
-    pendingModal=null;
-    const parent=modalParents.get(this);modalParents.delete(this);
-    if(parent&&state&&!state.readonly&&!document.querySelector('dialog[open]')){
-      nativeModalOpen.call(parent.dialog);refreshReturnedDetails(parent.dialog);
-      if(parent.dialog===utilityDialog)$('#mobile-more').setAttribute('aria-expanded','true');
-      if(parent.focus?.isConnected&&parent.dialog.contains(parent.focus))parent.focus.focus({preventScroll:true});
-    }
-  },0);
-};
+const desktopModal=window.DesktopModal=ModalShell.install({
+  stamp:modalViewStamp,
+  resume:dialog=>refreshReturnedDetails(dialog),
+  canDismiss:dialog=>dialog.classList.contains('task-conflict-dialog')||!(busy||accountBusy||courseSaving||shareBusy||confirmationPending)
+});
 // A selected sharing editor returns to its account list before leaving sharing.
 closeSharing=async function(){if(shareBusy)return;if(!shareEditor.hidden){await $('#share-back').onclick();return}$('#dashboard-token-value').value='';sharingDialog.close()};$('#sharing-close').onclick=closeSharing;
 let viewerDraftBaseline='',viewerAdminLoaded=false;function viewerDraftSnapshot(){return JSON.stringify(Object.fromEntries(new FormData($('#share-admin-form'))))}
@@ -228,10 +205,21 @@ const coursePreviewBeforeAdmin=nextCoursePreview;nextCoursePreview=function(){co
 const categoryTabs=document.createElement('nav');categoryTabs.className='detail-tabs';categoryTabs.innerHTML='<button type="button" class="active" data-category-tab="existing">已有分类</button><button type="button" data-category-tab="new">新增分类</button>';$('#category-rows').before(categoryTabs);function selectCategoryTab(tab){$('#category-rows').hidden=tab!=='existing';$('#category-form').hidden=tab!=='new';$('.category-add-heading').hidden=tab!=='new';categoryTabs.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.categoryTab===tab))}categoryTabs.onclick=e=>{const b=e.target.closest('[data-category-tab]');if(b&&!categoryBusy)selectCategoryTab(b.dataset.categoryTab)};selectCategoryTab('existing');
 // Disclosure wrappers in the utility window no longer carry disclosure semantics.
 for(let i=0;i<utilityGroups.length;i++){const details=utilityGroups[i],section=document.createElement('section');section.hidden=details.hidden;while(details.firstChild){if(details.firstChild.tagName==='SUMMARY')details.firstChild.remove();else section.append(details.firstChild)}details.replaceWith(section);utilityGroups[i]=section}
+DialogEffects.mount(utilityGroups[0]);
 selectUtility=function(tab){utilityTab=tab;utilityGroups.forEach((group,i)=>group.hidden=i!==(tab==='settings'?0:1));utilityDialog.querySelectorAll('[data-utility-tab]').forEach(b=>{const active=b.dataset.utilityTab===tab;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active))})};
 function dailyReminders(date,tasks){const end=Date.parse(date+'T23:59:59+08:00'),now=Math.min(Date.now(),end),rows=[];for(const task of tasks){if(task.done)continue;const points=[];if(task.due)points.push({label:'截止',at:task.due});for(const m of task.milestones||[])if(!m.done)points.push({label:m.label||'节点',at:m.stop_at});for(const point of points){const at=Date.parse(point.at.endsWith('+08:00')?point.at:point.at+'+08:00');if(at<=end)rows.push({task,...point,ms:at,late:at<now})}}rows.sort((a,b)=>a.ms-b.ms);if(!rows.length)return '';return `<section class="daily-reminders" aria-label="待办提醒"><h3>待办提醒 <span>${rows.length} 项未完成 · 逾期与当天到期</span></h3><div>${rows.map(row=>`<button class="${row.late?'overdue':''}" data-task="${esc(row.task.id)}"><span>${row.late?'!':'◆'}</span><strong>${esc(row.task.short_title||row.task.title)} · ${esc(row.label)}</strong><small>${esc(row.at.slice(5,16).replace('T',' '))}${row.late?' · 已逾期':''}</small></button>`).join('')}</div></section>`}
 const taskDetailsBeforeReturn=showTaskDetails;showTaskDetails=function(id){taskDetailsBeforeReturn(id);const dialog=$('#task-details');if(dialog)dialog.dataset.taskId=id};const courseDetailsBeforeReturn=showCourseDetails;showCourseDetails=function(key,date){courseDetailsBeforeReturn(key,date);const dialog=$('#course-details');if(dialog){dialog.dataset.courseKey=key;dialog.dataset.courseDate=date}};
-function refreshReturnedDetails(dialog){if(dialog.id==='task-details'&&dialog.dataset.taskId){const tab=dialog.querySelector('[data-detail-tab].active')?.dataset.detailTab;showTaskDetails(dialog.dataset.taskId);if(tab)dialog.querySelector(`[data-detail-tab="${tab}"]`)?.click()}if(dialog.id==='course-details'&&dialog.dataset.courseKey)showCourseDetails(dialog.dataset.courseKey,dialog.dataset.courseDate)}
+function refreshReturnedDetails(dialog){
+  if(dialog.id==='task-details'&&dialog.dataset.taskId){
+    if(!state.tasks.some(t=>t.id===dialog.dataset.taskId)){dialog.close();return}
+    const tab=dialog.querySelector('[data-detail-tab].active')?.dataset.detailTab;
+    showTaskDetails(dialog.dataset.taskId);if(tab)dialog.querySelector(`[data-detail-tab="${tab}"]`)?.click();
+  }
+  if(dialog.id==='course-details'&&dialog.dataset.courseKey){
+    const tab=dialog.querySelector('[data-course-detail-tab].active')?.dataset.courseDetailTab;
+    showCourseDetails(dialog.dataset.courseKey,dialog.dataset.courseDate);if(tab)dialog.querySelector(`[data-course-detail-tab="${tab}"]`)?.click();
+  }
+}
 // Preview returns to the same sharing editor rather than the dashboard root.
 let sharePreviewReturn=null;const personalShareClick=$('#my-shares').onclick;$('#my-shares').onclick=async e=>{const preview=e.target.closest('[data-share-preview]');if(preview)sharePreviewReturn={id:Number(preview.dataset.sharePreview),tab:policyTab};await personalShareClick(e)};const exitPreviewBeforeReturn=$('#exit-preview').onclick;$('#exit-preview').onclick=async()=>{await exitPreviewBeforeReturn();if(sharePreviewReturn&&!state.readonly){const target=sharePreviewReturn;sharePreviewReturn=null;await loadShares();sharingDialog.showModal();await selectShare(target.id);selectPolicyTab(target.tab)}};
 // Category migration is a child window with explicit context, not an expanding row.
@@ -293,7 +281,7 @@ showCourseDetails=function(key,date){
 function copyTask(id){
   if(state.readonly||busy||confirmationPending)return;
   const source=state.tasks.find(task=>task.id===id);if(!source)return;
-  $('#task-details')?.close();openTask(source.date);
+  openTask(source.date);
   for(const name of ['title','short_title','date','end_date','category','due','notes','start_time','end_time'])taskForm.elements[name].value=source[name]||'';
   taskForm.elements.schedule_mode.value=source.start_time?'minute':'date';scheduleModeUI();
   taskForm.elements.done.checked=false;

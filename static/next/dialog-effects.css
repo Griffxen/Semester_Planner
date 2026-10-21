@@ -1,0 +1,5 @@
+.next-ui #modal-shell::backdrop{background:#18271f60;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+html[data-dialog-backdrop=dim] .next-ui #modal-shell::backdrop{backdrop-filter:none;-webkit-backdrop-filter:none}
+.next-ui #modal-shell dialog::backdrop{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
+.next-ui .dialog-effects{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 0;font-size:12px;color:var(--muted)}
+.next-ui .dialog-effects select{width:auto;max-width:60%;margin:0;padding:6px 9px}
