@@ -6,6 +6,7 @@ html.modal-shell-open{overflow:hidden}
 .next-ui #modal-shell .modal-view>form{min-height:0}
 .next-ui #modal-shell #task-dialog,.next-ui #modal-shell #task-details,.next-ui #modal-shell #sharing-dialog,.next-ui #modal-shell #timetable-dialog,.next-ui #modal-shell #course-details,.next-ui #modal-shell #node-editor-dialog,.next-ui #modal-shell #account-dialog{overflow:hidden}
 .next-ui #modal-shell .modal-view>.dialog-head{flex-shrink:0}
+.next-ui #modal-shell .modal-navigation-icon{display:block;width:20px;height:20px;flex:none}
 .next-ui #modal-shell,.next-ui #modal-shell *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 48%,transparent) transparent}
 .next-ui #modal-shell ::-webkit-scrollbar{width:6px;height:6px}
 .next-ui #modal-shell ::-webkit-scrollbar-track{background:transparent}

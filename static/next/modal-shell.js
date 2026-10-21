@@ -20,6 +20,18 @@
       return node === view ? steps : null;
     };
     const locate = (view, steps) => steps?.reduce((node, step) => node?.children[step], view);
+    function navigation(frame) {
+      const button = frame.view.querySelector('.dialog-head > button,.task-conflict-head [data-close],:scope > header button');
+      if (button) {
+        const back = frames.indexOf(frame) > 0;
+        const label = back ? '返回上一页' : '退出窗口';
+        button.innerHTML = '<svg class="modal-navigation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(back?'<path d="m12 5-7 7 7 7M5 12h14"/>':'<path d="M9 5H5v14h4M9 12h11m-4-4 4 4-4 4"/>')+'</svg>';
+        button.setAttribute('aria-label', label); button.title = label;
+      }
+      const title = frame.view.querySelector('h1,h2,h3');
+      if (title) {if (!title.id) title.id = 'modal-view-title-'+(++serial); shell.setAttribute('aria-labelledby', title.id);}
+      else {shell.removeAttribute('aria-labelledby'); shell.setAttribute('aria-label', '窗口');}
+    }
     function remember(frame) {
       frame.focus = document.activeElement;
       frame.focusPath = path(frame.view, frame.focus);
@@ -41,17 +53,18 @@
       }
     }
     function measure(view) {
-      const saved = view.getAttribute('style');
+      const saved = view.style.cssText;
       view.classList.remove('modal-view');
       Object.assign(view.style, {position:'fixed', left:'-10000px', top:'0', right:'auto', bottom:'auto', margin:'0', visibility:'hidden', scrollbarGutter:'auto'});
       const display = getComputedStyle(view).display;
       const rect = view.getBoundingClientRect();
-      if (saved === null) view.removeAttribute('style'); else view.setAttribute('style', saved);
+      // CSSOM restoration respects the self-only CSP; setAttribute('style') does not.
+      view.style.cssText = saved;
       view.classList.add('modal-view');
-      view.style.setProperty('--modal-view-display', display);
+      view.style.setProperty('--modal-view-display', display === 'none' ? 'block' : display);
       return {width:rect.width || 600, height:rect.height || 500};
     }
-    function layout(frame, resize = false) {
+    function layout(frame, resize = false, animate = true) {
       if (frame !== currentFrame()) return;
       const from = shell.getBoundingClientRect();
       if (!frame.size || resize) frame.size = measure(frame.view);
@@ -72,7 +85,7 @@
         shell.style.height = target.height; shell.style.top = target.top;
         stage.style.height = Math.max(0,height-borderY)+'px';
       }
-      if (from.width && from.height && !matchMedia('(prefers-reduced-motion: reduce)').matches &&
+      if (animate && from.width && from.height && !matchMedia('(prefers-reduced-motion: reduce)').matches &&
           (Math.abs(from.width-width)>1 || Math.abs(from.height-height)>1 || Math.abs(from.top-parseFloat(target.top))>1)) {
         animation = shell.animate([{width:from.width+'px',height:from.height+'px',left:from.left+'px',top:from.top+'px'}, target], {duration:160,easing:'ease-out'});
       }
@@ -85,20 +98,18 @@
       const ticket = ++generation;
       queueMicrotask(() => {
         if (ticket !== generation || frame !== currentFrame()) return;
-        const title = frame.view.querySelector('h1,h2,h3');
-        if (title) {if (!title.id) title.id = 'modal-view-title-'+(++serial); shell.setAttribute('aria-labelledby', title.id);}
-        else {shell.removeAttribute('aria-labelledby'); shell.setAttribute('aria-label', '窗口');}
-        layout(frame, !resumed);
+        navigation(frame);
+        layout(frame, !resumed, resumed || frame.animate);
         restore(frame);
         // A cancelled mutation re-enables its buttons in the following microtask.
         requestAnimationFrame(() => {if (frame === currentFrame() && !frame.view.contains(document.activeElement)) restore(frame);});
       });
     }
     function open(view) {
-      if (has(view)) return;
+      if (has(view)) {queueMicrotask(() => {if (currentView() === view) navigation(currentFrame());}); return;}
       const parent = currentFrame();
       if (parent) remember(parent);
-      const frame = {view, opener:document.activeElement};
+      const frame = {view, opener:document.activeElement, animate:shell.open};
       view.classList.add('modal-view');
       view.setAttribute('role', 'presentation');
       view.setAttribute('open', '');
