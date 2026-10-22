@@ -35,4 +35,17 @@ for (const [client, helpers] of [['desktop',desktop],['mobile',mobileContext.cou
   assert.match(helpers.status({...data.course_dates[0],kind:'makeup',cancelled:true,holiday:true}),/补课已取消，原课仍停课/);
 }
 assert.equal(context.courseBlocks([data.course_dates[3]]),'','stopped rows are available to details, not actual calendar rendering');
+vm.runInContext(fs.readFileSync(path.join(root,'static/course-lists.js'),'utf8'),context);
+const listRows=[...data.course_dates,{...row('past','08:00–09:00'),date:'2026-10-01',original_date:'2026-10-01'},
+  {...row('next-year','10:00–11:00'),date:'2027-01-04',homework_required:true},
+  {...row('moved','09:00–10:00'),date:'2026-10-23',adjusted:true}];
+const seriesHtml=context.CourseLists.grouped(listRows,{today:'2026-10-22'});
+const [upcomingHtml,pastHtml]=seriesHtml.split('<details');
+assert.ok(upcomingHtml.includes('slot-a:2026-10-22')&&upcomingHtml.includes('slot-b:2026-10-22'),'same-day lessons each keep a clickable identity');
+assert.ok(!upcomingHtml.includes('past:2026-10-22')&&pastHtml.includes('past:2026-10-22'),'history is separate from upcoming lessons');
+assert.match(seriesHtml,/2027年1月4日/);
+assert.match(seriesHtml,/原定 10月22日 09:00–10:00/);
+assert.match(seriesHtml,/待交作业/);
+assert.ok(!seriesHtml.includes('按原课表上课')&&!seriesHtml.includes('数学'),'single-course rows omit repeated titles and routine status');
+assert.match(context.CourseLists.grouped(listRows,{today:'2026-10-22',changes:true}),/数学/,'mixed-course changes retain course names');
 console.log('Desktop/mobile course grouping, stable occurrences, source calendars and actual occupancy passed');

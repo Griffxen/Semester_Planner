@@ -3,6 +3,7 @@
   'use strict';
   const M = window.Mobile;
   const {esc, today, formatDate} = M.utils;
+  const lists = window.CourseLists;
   const days = ['', '一', '二', '三', '四', '五', '六', '日'];
   const empty = text => `<p class="m-empty">${esc(text)}</p>`;
   const dateLabel = date => formatDate ? formatDate(date) : date;
@@ -195,14 +196,10 @@
       }});
   }
 
-  function occurrenceButton(course) {
-    return `<button type="button" class="m-card m-task-card" data-action="open-course" data-course-key="${esc(course.course_key)}" data-original-date="${esc(course.original_date)}">
-      <strong>${esc(dateLabel(course.date))} · ${esc(course.time)}</strong>
-      <span class="m-meta">${esc(course.room || '未设置地点')}${' · ' + status(course)}${course.homework_required ? ' · 作业' + (course.homework_done ? '已完成' : '未完成') : ''}</span>
-      ${course.adjusted ? `<span class="m-meta">原定 ${esc(course.original_date)}</span>` : ''}</button>`;
-  }
   function bindOccurrenceButtons(page) {
-    page.querySelectorAll('[data-action="open-course"]').forEach(button => button.addEventListener('click', () => M.openCourse(button.dataset.courseKey, button.dataset.originalDate)));
+    page.querySelectorAll('[data-course-key]').forEach(button => button.addEventListener('click', () => {
+      button.focus({preventScroll: true}); M.openCourse(button.dataset.courseKey, button.dataset.courseDate);
+    }));
   }
   function openSeries(id) {
     const course = groups().find(item => item.course_id === id); if (!course) return;
@@ -211,11 +208,10 @@
         const render = () => {
           const current = groups().find(item => item.course_id === id); if (!current) return;
           const slots = new Set(current.slots.map(slot => slot.slot_id));
-          const rows = (M.data.course_dates || []).filter(row => row.course_id === id || slots.has(row.slot_id || row.course_key)).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-          const future = rows.filter(row => !row.cancelled && row.date >= today()), past = rows.filter(row => !row.cancelled && row.date < today()).reverse(), cancelled = rows.filter(row => row.cancelled);
-          const pastOpen = page.querySelector('[data-course-past]')?.open;
-          page.querySelector('[data-series-list]').innerHTML = current.slots.map(slot => `<p class="m-meta">${esc(rule(slot))} · ${esc(slot.time)}${slot.room ? ' · ' + esc(slot.room) : ''}</p>`).join('') + `<p><a href="/timetables/?personal=1">编辑课程与时段</a></p><section class="m-section"><h2>接下来的课程 · ${future.length}</h2>${future.map(occurrenceButton).join('') || empty('当前学期没有后续课程。')}</section>${past.length ? `<details class="m-section" data-course-past ${pastOpen ? 'open' : ''}><summary>过去课程 · ${past.length}</summary>${past.map(occurrenceButton).join('')}</details>` : ''}<section class="m-section"><h2>停课与取消记录 · ${cancelled.length}</h2>${cancelled.map(occurrenceButton).join('') || empty('暂无停课记录。')}</section>`;
-          bindOccurrenceButtons(page); M.decorate(page);
+          const rows = (M.data.course_dates || []).filter(row => row.course_id === id || slots.has(row.slot_id || row.course_key));
+          const container = page.querySelector('[data-series-list]'), scroll = page.querySelector('.m-page-body'), saved = lists.remember(container, scroll);
+          container.innerHTML = `<div class="m-course-rules">${lists.rules(current.slots || [])}</div><div class="course-list-toolbar"><a href="/timetables/?personal=1">编辑课程与时段 ↗</a></div>${lists.grouped(rows, {today: today()})}`;
+          bindOccurrenceButtons(page); lists.restore(container, saved, scroll); M.decorate(page);
         };
         page.querySelector('[data-action="extra-course"]').addEventListener('click', () => openMakeup(id));
         render(); watchData(page, render);
@@ -229,18 +225,20 @@
       onMount(page) {
         const render = () => {
           page.querySelectorAll('[data-course-tab]').forEach(button => { const active = button.dataset.courseTab === tab; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
-          const body = page.querySelector('[data-courses-list]');
+          const body = page.querySelector('[data-courses-list]'), scroll = page.querySelector('.m-page-body');
+          const saved = body.dataset.tab === tab ? lists.remember(body, scroll) : null;
+          body.dataset.tab = tab;
           if (tab === 'personal') {
             const courses = groups();
-            body.innerHTML = `<p class="m-meta">共 ${courses.length} 门课程，${(M.data.timetable || []).length} 个固定时段。选择课程查看全部课次及作业。</p><p><a href="/timetables/?personal=1">设计我的课程与时段</a></p>` + (courses.map(course => `<button type="button" class="m-card m-task-card" data-course-series="${esc(course.course_id)}"><strong>${esc(course.name)}</strong>${course.slots.map(slot => `<span class="m-meta">${esc(rule(slot))} · ${esc(slot.time)}</span>`).join('')}</button>`).join('') || empty('尚未添加课程。可在可用模板中预览并导入。'));
-            body.querySelectorAll('[data-course-series]').forEach(button => button.addEventListener('click', () => openSeries(button.dataset.courseSeries)));
+            body.innerHTML = lists.courses(courses, (M.data.timetable || []).length);
+            body.querySelectorAll('[data-course-series]').forEach(button => button.addEventListener('click', () => {button.focus({preventScroll: true}); openSeries(button.dataset.courseSeries);}));
           }
           if (tab === 'changes') {
-            const rows = (M.data.course_dates || []).filter(course => course.adjusted || course.cancelled || course.archived || ['makeup', 'extra'].includes(course.kind)).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-            body.innerHTML = '<p class="m-meta">选择停课或取消的原课次可安排补课；取消补课后原课仍停课。</p>' + (rows.map(course => `<section class="m-card"><h2>${esc(course.name)}</h2>${occurrenceButton(course)}</section>`).join('') || empty('暂无临时调整与停课记录。'));
+            const rows = (M.data.course_dates || []).filter(course => course.adjusted || course.cancelled || course.archived || ['makeup', 'extra'].includes(course.kind));
+            body.innerHTML = lists.grouped(rows, {today: today(), changes: true});
           }
           if (tab === 'template') body.innerHTML = '<section class="m-card"><h2>课表模板设计器</h2><p>各份模板可分别预览、合并导入和更新；提交前查看差异并保留个人修改。</p><a href="/timetables/">浏览可用模板与导入</a></section>';
-          bindOccurrenceButtons(page); M.decorate(page);
+          bindOccurrenceButtons(page); lists.restore(body, saved, scroll); if (!saved) scroll.scrollTop = 0; M.decorate(page);
         };
         page.querySelectorAll('[data-course-tab]').forEach(button => button.addEventListener('click', () => { tab = button.dataset.courseTab; render(); }));
         render(); watchData(page, render);

@@ -51,6 +51,8 @@ class Frontend(unittest.TestCase):
                             ('/app.js', 'text/javascript'),
                             ('/task-conflicts.js', 'text/javascript'),
                             ('/task-conflicts.css', 'text/css'),
+                            ('/course-lists.js', 'text/javascript'),
+                            ('/course-lists.css', 'text/css'),
                             ('/deferred.css', 'text/css'),
                             ('/next/deferred.js', 'text/javascript'),
                             ('/next/export-entry.js', 'text/javascript'),

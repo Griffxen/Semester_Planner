@@ -44,7 +44,7 @@
     root.querySelectorAll('[data-due]').forEach(el=>{const task=M.data?.tasks.find(t=>t.id===el.dataset.due),category=M.data?.categories.find(c=>c.name===task?.category);if(!task||task.done||!task.due)return;const days=(Date.parse(task.due+'+08:00')-Date.now())/86400000;el.classList.toggle('is-late',days<0||days<=(category?.urgent_days??2));el.classList.toggle('is-soon',days>=0&&days<=(category?.warn_days??7));});
   };
 
-  function rememberScroll(){const record=records[index];if(!record)return;record.scroll=record.type==='page'?record.node.querySelector('.m-page-body').scrollTop:scrollY;}
+  function rememberScroll(){const record=records[index];if(!record)return;record.scroll=record.type==='page'?record.node.querySelector('.m-page-body').scrollTop:scrollY;if(record.type==='page')record.courseItem=record.node.contains(document.activeElement)?document.activeElement.closest('[data-course-item]')?.dataset.courseItem:null;}
   function snapshot(){return JSON.parse(JSON.stringify(ui));}
   function activate(target) {
     index=target;
@@ -53,7 +53,7 @@
     const page=record.type==='page';
     document.body.classList.toggle('m-page-open',page);
     $('#m-app').inert=page;
-    if(page){if(!record.node.isConnected)$('#m-pages').append(record.node);if(record.committed){record.node.querySelector('.m-page-body').innerHTML='<p class="m-empty">这次操作已经保存。返回后可重新打开最新内容。</p>';record.node.querySelector('.m-page-actions').replaceChildren();record.dirty=()=>false;}record.node.hidden=false;record.node.inert=false;if(!record.committed)record.node.dispatchEvent(new CustomEvent('mobile:resume'));requestAnimationFrame(()=>{record.node.querySelector('.m-page-body').scrollTop=record.scroll||0;record.node.querySelector('.m-page-back').focus({preventScroll:true});});}
+    if(page){if(!record.node.isConnected)$('#m-pages').append(record.node);if(record.committed){record.node.querySelector('.m-page-body').innerHTML='<p class="m-empty">这次操作已经保存。返回后可重新打开最新内容。</p>';record.node.querySelector('.m-page-actions').replaceChildren();record.dirty=()=>false;}record.node.hidden=false;record.node.inert=false;if(!record.committed)record.node.dispatchEvent(new CustomEvent('mobile:resume'));requestAnimationFrame(()=>{record.node.querySelector('.m-page-body').scrollTop=record.scroll||0;const focus=record.courseItem&&[...record.node.querySelectorAll('[data-course-item]')].find(node=>node.dataset.courseItem===record.courseItem);(focus||record.node.querySelector('.m-page-back')).focus({preventScroll:true});});}
     else {Object.assign(ui,record.ui);renderRoot();requestAnimationFrame(()=>window.scrollTo(0,record.scroll||0));}
     backWaiters.splice(0).forEach(resolve=>resolve(true));
   }

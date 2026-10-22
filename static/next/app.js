@@ -100,6 +100,24 @@ const createAccountButton=document.createElement('button');createAccountButton.t
 
 const oldAccountSubmit=accountForm.onsubmit;accountForm.onsubmit=async e=>{e.preventDefault();if(accountBusy)return;if(!accountForm.reportValidity())return;lastActionButton=accountForm.querySelector('.primary');if(accountForm.elements.action.value!=='reset'&&!await askConfirm('确认提交此账户修改？接下来需验证身份。'))return;return oldAccountSubmit(e)};
 // Courses: inspect your timetable, the public template, or adjustments at one depth.
+const courseLists=window.CourseLists;
+personalCoursesMarkup=function(){return courseLists.courses(personalCourseGroups(),(state.timetable||[]).length)};
+courseOccurrenceList=function(rows){return courseLists.occurrences(rows,{today:today(),showName:true})};
+bindCourseRows=function(container){container.querySelectorAll('[data-course-key]').forEach(button=>button.onclick=()=>{button.focus({preventScroll:true});showCourseDetails(button.dataset.courseKey,button.dataset.courseDate)})};
+showCourseSeries=function(id){
+ const group=personalCourseGroups().find(c=>c.course_id===id);if(!group||state.readonly)return;
+ let dialog=$('#course-series-dialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='course-series-dialog';document.body.append(dialog)}
+ const saved=dialog.dataset.courseId===id?courseLists.remember(dialog,dialog.querySelector('.course-series-scroll')||dialog):null;
+ dialog.dataset.courseId=id;const slotIds=new Set((group.slots||[]).map(slot=>slot.slot_id));
+ const rows=(state.course_dates||[]).filter(row=>row.course_id===id||slotIds.has(row.slot_id||row.course_key));
+ dialog.innerHTML=`<div class="dialog-head"><h2>${esc(group.name)}</h2><button type="button" data-close aria-label="关闭">×</button></div><div class="course-series-overview">${courseLists.rules(group.slots||[])}</div><div class="course-series-actions"><button class="primary" type="button" data-extra>添加额外课程</button><a href="/timetables/?personal=1">编辑课程与时段 ↗</a></div><div class="course-series-scroll">${courseLists.grouped(rows,{today:today()})}</div>`;
+ dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.querySelector('[data-extra]').onclick=()=>openCourseMakeup(id);bindCourseRows(dialog);courseLists.restore(dialog,saved,dialog.querySelector('.course-series-scroll'));dialog.showModal();
+};
+renderCourseChanges=function(){
+ const host=$('#personal-course-changes'),scroll=$('#course-body')||host,saved=courseLists.remember(host,scroll);
+ const rows=(state.course_dates||[]).filter(row=>row.cancelled||row.adjusted||row.archived||['extra','makeup'].includes(row.kind));
+ host.innerHTML=courseLists.grouped(rows,{today:today(),changes:true});bindCourseRows(host);courseLists.restore(host,saved,scroll);
+};
 const courseTabs=document.createElement('div');courseTabs.className='detail-tabs';courseTabs.setAttribute('role','tablist');courseTabs.setAttribute('aria-label','课表内容');$('#course-preview').before(courseTabs);let courseTab='personal';
 function nextCoursePreview(){
  courseTabs.innerHTML=[['personal','我的课程'],['template','可用模板'],['changes','临时调整']].map(([id,label])=>`<button role="tab" aria-selected="${id===courseTab}" class="${id===courseTab?'active':''}" data-course-tab="${id}">${label}</button>`).join('');

@@ -18,3 +18,7 @@
 .m-untimed-summary::before{content:"";display:inline-block;width:5px;height:5px;margin-right:4px;border-radius:50%;background:var(--timeline-untimed,#b38a61);vertical-align:1px}
 
 .m-week-summary>strong{display:flex;align-items:center;gap:5px;flex-wrap:wrap}.m-week-summary .m-untimed-summary{margin-left:auto;color:var(--muted);font-size:10px;white-space:nowrap;font-weight:400}
+/* Course lists share their row layout with the desktop manager. */
+.m-course-rules{padding:0 6px 16px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.m-page-body .course-list-toolbar{margin-bottom:8px}
+.m-page-body .course-list-section{margin-bottom:18px}

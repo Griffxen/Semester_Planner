@@ -117,7 +117,8 @@ html{scrollbar-gutter:stable}
 .next-ui #timetable-dialog[open]{display:flex;flex-direction:column;overflow:hidden}
 .next-ui #timetable-dialog>.dialog-head,.next-ui #timetable-dialog>p,.next-ui #timetable-dialog>.detail-tabs{flex-shrink:0}
 .next-ui #course-body{flex:1;min-height:0;overflow:auto;padding-right:2px}
-.next-ui .course-footer{height:58px;flex-shrink:0;border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.next-ui .course-footer{flex-shrink:0}
+.next-ui .course-footer:has(#course-error:not(:empty)){border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
 .next-ui .course-footer button{font-size:12px}
 .next-ui .course-footer #course-error{margin:4px 0;font-size:11px}
 .context-panels{display:grid;grid-template-columns:minmax(230px,1fr) minmax(0,2fr);gap:12px;margin-bottom:20px}
@@ -251,3 +252,14 @@ html[data-theme=dark] .next-ui .course-homework-badge.homework-done{color:#8da29
   .next-ui .stats{gap:8px}
   .next-ui .stats>div{min-height:70px;padding:9px 12px}
 }
+/* Course series keep the same frame while history expands or details are saved. */
+.next-ui #course-series-dialog{box-sizing:border-box;width:660px;height:min(700px,calc(100dvh - 32px));max-width:calc(100vw - 32px)}
+.next-ui #course-series-dialog[open],.next-ui #modal-shell #course-series-dialog[open]{display:flex;flex-direction:column;overflow:hidden}
+.next-ui #course-series-dialog>.dialog-head{position:static;flex-shrink:0;margin-bottom:0}
+.next-ui .course-series-overview{flex-shrink:0;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.next-ui .course-series-actions{flex-shrink:0;display:flex;align-items:center;gap:16px;padding:14px 0}
+.next-ui .course-series-actions button{font-size:12px}
+.next-ui .course-series-actions a{font-size:12px;color:var(--muted);text-decoration:none}
+.next-ui .course-series-actions a:hover{text-decoration:underline}
+.next-ui .course-series-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:3px}
+@media(max-width:700px){.next-ui #course-series-dialog{width:calc(100vw - 32px);height:calc(100dvh - 32px)}.next-ui .course-series-actions{gap:12px;flex-wrap:wrap}}

@@ -135,7 +135,7 @@ class Handler(BaseHTTPRequestHandler):
                 '/m':'mobile/index.html', '/m/':'mobile/index.html',
                 '/timetables':'timetables/index.html', '/timetables/':'timetables/index.html',
                 '/mobile-entry.js':'mobile-entry.js'}
-        for prefix,names in [('',('app.js','style.css','icon.svg','share.js','export.js','export.css','deferred.js','deferred.css','task-conflicts.js','task-conflicts.css')),
+        for prefix,names in [('',('app.js','style.css','icon.svg','share.js','export.js','export.css','deferred.js','deferred.css','task-conflicts.js','task-conflicts.css','course-lists.js','course-lists.css')),
                              ('legacy/',('app.js','style.css','icon.svg','share.js','transition.css')),
                              ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css','export-entry.js','deferred.js','modal-shell.js','modal-shell.css','dialog-effects.js','dialog-effects.css')),
                              ('m/',('app.js','domain.js','tasks.js','courses.js','manage.js','style.css','export-entry.js')),

@@ -35,6 +35,7 @@
     }
     function remember(frame) {
       frame.focus = document.activeElement;
+      frame.courseItem = frame.view.contains(frame.focus) ? frame.focus.closest('[data-course-item]')?.dataset.courseItem : null;
       frame.focusPath = path(frame.view, frame.focus);
       frame.scrolls = [frame.view, ...frame.view.querySelectorAll('*')]
         .filter(node => node.scrollTop || node.scrollLeft)
@@ -46,7 +47,7 @@
         const node = saved.node.isConnected ? saved.node : locate(frame.view, saved.path);
         if (node) {node.scrollTop = saved.top; node.scrollLeft = saved.left;}
       }
-      const focus = frame.focus?.isConnected ? frame.focus : locate(frame.view, frame.focusPath);
+      const focus = frame.courseItem ? [...frame.view.querySelectorAll('[data-course-item]')].find(node => node.dataset.courseItem === frame.courseItem) : frame.focus?.isConnected ? frame.focus : locate(frame.view, frame.focusPath);
       if (focus && !focus.disabled && !focus.closest('[hidden]')) focus.focus({preventScroll:true});
       else if (!frame.view.contains(document.activeElement) || document.activeElement === frame.view) {
         const target = frame.view.querySelector('[autofocus],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled])');
