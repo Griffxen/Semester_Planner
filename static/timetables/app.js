@@ -1,9 +1,57 @@
 /* Course designer: local draft edits are committed together through versioned APIs. */
 (function () {
   'use strict';
+  let instanceSequence = 0;
+  async function mount(root, options = {}) {
+    if (!(root instanceof Element)) throw Error('课表设计器需要一个挂载节点');
+    const response = await fetch('/timetables/', {credentials: 'same-origin'});
+    if (!response.ok) throw Error('无法读取课表设计器');
+    const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const fragment = document.createDocumentFragment();
+    for (const node of page.body.children) {
+      if (node.matches('main,dialog,#toast')) fragment.append(document.importNode(node, true));
+    }
+    root.replaceChildren(fragment);
+    root.classList.add('course-designer');
+    const prefix = `course-designer-${++instanceSequence}-`;
+    for (const node of root.querySelectorAll('[id]')) {
+      node.dataset.designerId = node.id;
+      node.id = prefix + node.id;
+    }
+    for (const node of root.querySelectorAll('[for],[aria-labelledby],[aria-describedby],[aria-controls],[form]')) {
+      for (const name of ['for','aria-labelledby','aria-describedby','aria-controls','form']) {
+        if (node.hasAttribute(name)) node.setAttribute(name, node.getAttribute(name).split(/\s+/).map(id => prefix + id).join(' '));
+      }
+    }
+    for (const dialog of root.querySelectorAll('dialog')) dialog.classList.add('course-designer', 'course-designer-modal');
+    const instance = createDesigner(root, {...options, embedded: true});
+    await instance.ready;
+    return instance;
+  }
+  function createDesigner(root, options = {}) {
   const D = window.TimetableDesigner;
-  const $ = selector => document.querySelector(selector);
-  const $$ = selector => [...document.querySelectorAll(selector)];
+  const embedded = !!options.embedded;
+  const ownedDialogs = embedded ? [...root.querySelectorAll('dialog')] : [];
+  const query = selector => embedded ? selector.replace(/#([a-zA-Z][\w-]*)/g, '[data-designer-id="$1"]') : selector;
+  const $$ = selector => {
+    const scoped = query(selector);
+    return [...new Set([root, ...ownedDialogs].flatMap(scope => [
+      ...(scope.matches?.(scoped) ? [scope] : []), ...scope.querySelectorAll(scoped)
+    ]))];
+  };
+  const $ = selector => $$(selector)[0] || null;
+  const listeners = [];
+  const listen = (target, type, handler) => {target.addEventListener(type, handler); listeners.push(() => target.removeEventListener(type, handler));};
+  let destroyed = false, pendingRequests = 0;
+  const requests = new AbortController();
+  const confirmations = new Set();
+  const editorScope = embedded ? root : document.body;
+  const saved = kind => {
+    if (!options.onSaved || destroyed) return;
+    Promise.resolve().then(() => options.onSaved({kind, personal, templateId: personal ? null : plan?.template_id})).catch(error => {
+      if (!destroyed) errorAt(error);
+    });
+  };
   const esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   const uid = prefix => `${prefix}_${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`;
   const days = ['一', '二', '三', '四', '五', '六', '日'];
@@ -24,30 +72,37 @@
   const dirty = () => planDirty() || permissionsDirty();
   const draftKey = () => `semester-course-draft:${session?.user?.id || session?.user?.name || 'self'}:${personal ? 'personal' : plan?.template_id}`;
   function notify(message) {
+    if (destroyed) return;
     clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').hidden = false;
     toastTimer = setTimeout(() => { $('#toast').hidden = true; }, 4000);
   }
   function errorAt(error, selector = '#page-error') {
+    if (destroyed) return;
     $(selector).textContent = error.message || String(error);
-    if (error.status === 409) { $('#version-warning').hidden = false; $('#latest-link').href = location.href; }
+    if (error.status === 409) { $('#version-warning').hidden = false; $('#latest-link').href = personal ? '/timetables/?personal=1' : `/timetables/?template=${encodeURIComponent(plan?.template_id || '')}`; }
     if (selector === '#page-error') $(selector).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
   async function api(path, method = 'GET', data) {
+    pendingRequests++;
+    try {
     const response = await fetch(`/api/${path}`, {
-      method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(session?.csrf ? { 'X-CSRF-Token': session.csrf } : {}) },
+      method, credentials: 'same-origin', signal: requests.signal, headers: { 'Content-Type': 'application/json', ...(session?.csrf ? { 'X-CSRF-Token': session.csrf } : {}) },
       ...(data === undefined ? {} : { body: JSON.stringify(data) })
     });
     let result; try { result = await response.json(); } catch (_) { result = {}; }
+    if (destroyed) throw new DOMException('设计器已关闭', 'AbortError');
     if (!response.ok) {
       if (response.status === 401) { $('#workspace').hidden = true; $('#login').hidden = false; }
       throw Object.assign(Error(result.error || `请求失败（${response.status}）`), { status: response.status, details: result });
     }
     return result;
+    } finally {pendingRequests--;}
   }
   function confirm(message, title = '请确认') {
     return new Promise(resolve => {
       const dialog = $('#confirm-dialog'); $('#confirm-heading').textContent = title; $('#confirm-message').textContent = message;
-      function finish(value) { dialog.close(); resolve(value); }
+      function finish(value) { confirmations.delete(finish); if (dialog.open) dialog.close(); resolve(value); }
+      confirmations.add(finish);
       $('#confirm-ok').onclick = () => finish(true); $('#confirm-cancel').onclick = () => finish(false);
       dialog.oncancel = event => { event.preventDefault(); finish(false); };
       dialog.showModal(); $('#confirm-cancel').focus();
@@ -70,6 +125,7 @@
     } catch (_) { /* Draft stays in memory if browser storage is unavailable. */ }
   }
   function status() {
+    if (destroyed) return;
     $('#dirty-status').textContent = busy ? '正在保存…' : dirty() ? '有未保存的草稿' : canEdit() ? '已保存' : '只读';
     $('#save').disabled = busy || !canEdit() || !planDirty();
     $('#discard').disabled = busy || !dirty();
@@ -87,16 +143,16 @@
   }
   function setPageQuery() {
     const query = personal ? '?personal=1' : `?template=${encodeURIComponent(plan.template_id)}`;
-    history.replaceState(null, '', `/timetables/${query}`);
+    if (!embedded) history.replaceState(null, '', `/timetables/${query}`);
   }
   function showTab(tab) {
-    currentTab = tab; $$('.tab-panel').forEach(panel => { panel.hidden = panel.id !== `panel-${tab}`; });
+    currentTab = tab; $$('.tab-panel').forEach(panel => { panel.hidden = (embedded ? panel.dataset.designerId : panel.id) !== `panel-${tab}`; });
     $$('[data-tab]').forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
     if (tab === 'permissions' && canManage() && !permissions) loadPermissions().catch(error => errorAt(error, '#permission-error'));
     status();
   }
   async function loadTemplates(show = true) {
-    if (show && !await leaveDraft()) return;
+    if (show && !await leaveDraft()) return false;
     const data = await api('timetables'); templates = data.templates || []; accounts = data.accounts || accounts;
     $('#create-template').hidden = !session?.user?.admin && !accounts.length;
     renderTemplates();
@@ -104,8 +160,9 @@
       closeEditor(); plan = null; base = ''; permissions = null; permissionBase = ''; periodBase = ''; holidayBase = '';
       $('#designer').hidden = true; $('#template-list').hidden = false;
       $('#nav-templates').classList.add('active'); $('#nav-personal').classList.remove('active');
-      history.replaceState(null, '', '/timetables/'); $('#page-error').textContent = '';
+      if (!embedded) history.replaceState(null, '', '/timetables/'); $('#page-error').textContent = '';
     }
+    return true;
   }
   function renderTemplates() {
     $('#template-cards').innerHTML = templates.length ? templates.map(template => {
@@ -134,7 +191,7 @@
         if (saved.slot) for (const [name, value] of saved.slot) if ($('#slot-form').elements[name]) $('#slot-form').elements[name].value = value;
         timeMode();
       }
-      if (latestVersion !== plan.version) { $('#version-warning').hidden = false; $('#latest-link').href = location.href; }
+      if (latestVersion !== plan.version) { $('#version-warning').hidden = false; $('#latest-link').href = personal ? '/timetables/?personal=1' : `/timetables/?template=${encodeURIComponent(plan?.template_id || '')}`; }
       if (saved.permission && canManage()) {
         await loadPermissions();
         for (const input of $$('#permissions-form input[type=checkbox]')) input.checked = false;
@@ -206,7 +263,7 @@
     $('#week-grid').innerHTML = html;
   }
   function closeEditor() {
-    $('#editor-panel').classList.remove('mobile-open'); document.body.classList.remove('editor-open');
+    $('#editor-panel').classList.remove('mobile-open'); editorScope.classList.remove('editor-open');
   }
   async function leaveSlot() {
     if (!slotDirty()) return true;
@@ -227,7 +284,7 @@
     $('#slot-error').textContent = ''; $('#remove-slot').hidden = !slot || !canEdit(); $('#split-slot').hidden = !slot || course.slots.length < 2 || !canEdit();
     $('#new-slot').hidden = !canEdit(); $('#remove-course').hidden = !canEdit(); $('#apply-slot').hidden = !canEdit();
     timeMode(); formBase = formValue(form); renderCourses(); renderWeek();
-    $('#editor-panel').classList.add('mobile-open'); document.body.classList.add('editor-open');
+    $('#editor-panel').classList.add('mobile-open'); editorScope.classList.add('editor-open');
     if (matchMedia('(max-width:760px)').matches) $('#editor-heading').scrollIntoView({ block: 'start' });
     status();
   }
@@ -345,7 +402,7 @@
         clearDraft(); plan = normalize(result); base = JSON.stringify(plan); $('#version-warning').hidden = true; $('#page-error').textContent = '';
         if (permissions) permissions.version = plan.version;
         renderPlan(); if (selectedCourse && courseById(selectedCourse)) editSlot(selectedCourse, selectedSlot); closeEditor();
-        notify('课表已保存'); return true;
+        notify('课表已保存'); saved('plan'); return true;
       } catch (error) { errorAt(error); return false; }
     });
   }
@@ -379,7 +436,7 @@
         const users = $$('#permission-rows .permission-row').map(row => ({ user_id: /^\d+$/.test(row.dataset.user) ? Number(row.dataset.user) : row.dataset.user, use: row.querySelector('[data-use]').checked || row.querySelector('[data-edit]').checked, edit: row.querySelector('[data-edit]').checked }));
         const result = await api(`timetables/${encodeURIComponent(plan.template_id)}/permissions`, 'PUT', { version: permissions?.version ?? plan.version, public: $('#permissions-form').elements.public.checked, users });
         permissions = result; plan.version = result.version; base = JSON.stringify(plan); permissionBase = formValue($('#permissions-form'));
-        $('#permission-error').textContent = ''; notify('此模板的权限已保存');
+        $('#permission-error').textContent = ''; notify('此模板的权限已保存'); saved('permissions');
       } catch (error) { errorAt(error, '#permission-error'); }
     });
   }
@@ -409,22 +466,22 @@
       try {
         await api(`timetables/${encodeURIComponent(importId)}/import`, 'POST', { template_version: preview.template_version, plan_version: preview.plan_version, overwrite: $$('#import-conflicts [data-overwrite]:checked').map(input => input.dataset.overwrite) });
         $('#import-dialog').close(); preview = null;
-        await openPlan('', true, true); notify('已更新我的课程，未选择覆盖的个人修改已保留');
-      } catch (error) { errorAt(error, '#import-error'); if (error.status === 409 || error.status === 403) $('#confirm-import').disabled = true; else $('#confirm-import').disabled = false; }
+        await openPlan('', true, true); notify('已更新我的课程，未选择覆盖的个人修改已保留'); saved('import');
+      } catch (error) { if (destroyed) return; errorAt(error, '#import-error'); if (error.status === 409 || error.status === 403) $('#confirm-import').disabled = true; else $('#confirm-import').disabled = false; }
     });
   }
   async function templateAction(kind, id) {
     const template = templates.find(item => item.template_id === id); if (!template?.can_manage) return;
     if (kind === 'archive') {
       if (!await confirm(`归档“${template.name}”后将停止读取、导入与更新，已有个人副本保留。确认归档？`, '归档模板')) return;
-      await api(`timetables/${encodeURIComponent(id)}/archive`, 'POST', { version: template.version }); await loadTemplates(false); notify('模板已归档'); return;
+      await api(`timetables/${encodeURIComponent(id)}/archive`, 'POST', { version: template.version }); await loadTemplates(false); notify('模板已归档'); saved('template-archive'); return;
     }
     openName(kind === 'copy' ? '复制模板' : '重命名模板', kind === 'copy' ? `${template.name}（副本）` : template.name, async name => {
       if (kind === 'copy') {
-        const result = await api(`timetables/${encodeURIComponent(id)}/copy`, 'POST', { name, version: template.version }); await loadTemplates(false); await openPlan(result.template_id, false, true);
+        const result = await api(`timetables/${encodeURIComponent(id)}/copy`, 'POST', { name, version: template.version }); await loadTemplates(false); await openPlan(result.template_id, false, true); saved('template-copy');
       } else {
         const latest = await api(`timetables/${encodeURIComponent(id)}`);
-        await api(`timetables/${encodeURIComponent(id)}`, 'PUT', { ...latest, name, version: template.version }); await loadTemplates(false);
+        await api(`timetables/${encodeURIComponent(id)}`, 'PUT', { ...latest, name, version: template.version }); await loadTemplates(false); saved('template-rename');
       }
     });
   }
@@ -521,9 +578,9 @@
     $('#permission-rows').onchange = event => { const row = event.target.closest('[data-user]'); if (!row) return; if (event.target.hasAttribute('data-edit') && event.target.checked) row.querySelector('[data-use]').checked = true; if (event.target.hasAttribute('data-use') && !event.target.checked) row.querySelector('[data-edit]').checked = false; status(); };
     $('#name-form').onsubmit = async event => {
       event.preventDefault(); const value = event.target.elements.name.value.trim(); if (!value || busy) return;
-      try { const action = nameAction; $('#name-dialog').close(); await action(value); } catch (error) { if (!$('#name-dialog').open) $('#name-dialog').showModal(); errorAt(error, '#name-error'); }
+      try { const action = nameAction; $('#name-dialog').close(); await action(value); } catch (error) { if (destroyed) return; if (!$('#name-dialog').open) $('#name-dialog').showModal(); errorAt(error, '#name-error'); }
     };
-    $('#create-template').onclick = () => openName('新建课表模板', '', async name => { const result = await api('timetables', 'POST', { name, courses: [], periods: [], holidays: [] }); await loadTemplates(false); await openPlan(result.template_id, false, true); });
+    $('#create-template').onclick = () => openName('新建课表模板', '', async name => { const result = await api('timetables', 'POST', { name, courses: [], periods: [], holidays: [] }); await loadTemplates(false); await openPlan(result.template_id, false, true); saved('template-create'); });
     $('#template-cards').onclick = async event => {
       const button = event.target.closest('button'); if (!button) return;
       try {
@@ -539,23 +596,60 @@
     $('#confirm-import').onclick = commitImport;
     $$('[data-close-dialog]').forEach(button => { button.onclick = () => button.closest('dialog').close(); });
     for (const form of [$('#slot-form'), $('#period-form'), $('#holiday-form'), $('#permissions-form')]) { form.addEventListener('input', status); form.addEventListener('change', status); }
-    $('#theme-toggle').onclick = () => { const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = theme; try { localStorage.setItem('semester-theme', theme); } catch (_) {} };
-    window.addEventListener('beforeunload', event => { if (dirty() || busy) { keepDraft(); event.preventDefault(); event.returnValue = ''; } });
-    document.addEventListener('click', async event => {
-      const link = event.target.closest('a[href]'); if (!link || link.target === '_blank' || !dirty() || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-      event.preventDefault(); if (await leaveDraft()) { base = JSON.stringify(plan); formBase = formValue($('#slot-form')); periodBase = formValue($('#period-form')); holidayBase = formValue($('#holiday-form')); permissionBase = formValue($('#permissions-form')); location.href = link.href; }
+    if ($('#theme-toggle')) $('#theme-toggle').onclick = () => { const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = theme; try { localStorage.setItem('semester-theme', theme); } catch (_) {} };
+    listen(window, 'beforeunload', event => { if (dirty() || busy || pendingRequests) { keepDraft(); event.preventDefault(); event.returnValue = ''; } });
+    listen(embedded ? root : document, 'click', async event => {
+      const link = event.target.closest('a[href]');
+      if (!link || link.target === '_blank' || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const url = new URL(link.href, location.href);
+      const internal = embedded && options.onNavigate && url.origin === location.origin && ['/','/next/'].includes(url.pathname);
+      if (internal) {
+        event.preventDefault();
+        await options.onNavigate(url.searchParams.get('courses') === 'adjustments' ? {page: 'courses', tab: 'changes'} : {page: 'home'});
+        return;
+      }
+      if (!dirty()) return;
+      event.preventDefault();
+      if (await leaveDraft()) {
+        base = JSON.stringify(plan); formBase = formValue($('#slot-form')); periodBase = formValue($('#period-form'));
+        holidayBase = formValue($('#holiday-form')); permissionBase = formValue($('#permissions-form')); location.href = link.href;
+      }
     });
   }
   async function init() {
     try {
-      session = await api('state');
+      session = options.session || await api('state');
       if (session.readonly) { $('#loading').textContent = '展示账户只能查看已授权的个人日程。请返回看板。'; return; }
       bind(); await loadTemplates(false); $('#loading').hidden = true; $('#workspace').hidden = false;
+      if (embedded) { $('#template-list').hidden = false; $('#nav-templates').classList.add('active'); return; }
       const query = new URLSearchParams(location.search);
       if (query.get('personal') === '1') await openPlan('', true, true);
       else if (query.get('template')) await openPlan(query.get('template'), false, true);
       else { $('#template-list').hidden = false; $('#nav-templates').classList.add('active'); }
-    } catch (error) { $('#loading').hidden = true; if (error.status !== 401) errorAt(error); }
+    } catch (error) { if (destroyed) return; $('#loading').hidden = true; if (error.status !== 401) errorAt(error); }
   }
-  init();
+  const ready = init();
+  return {
+    ready,
+    async open({personal: mine = false, templateId} = {}) {
+      await ready;
+      if (destroyed || !session || session.readonly || busy) return false;
+      if ((mine && personal && plan) || (!mine && templateId && !personal && plan?.template_id === templateId)) return true;
+      if (mine || templateId) return openPlan(templateId || '', mine);
+      return loadTemplates();
+    },
+    isDirty: () => !destroyed && dirty(),
+    isBusy: () => !destroyed && (busy || pendingRequests > 0),
+    destroy() {
+      if (destroyed) return;
+      keepDraft(); destroyed = true; requests.abort(); clearTimeout(toastTimer);
+      for (const finish of [...confirmations]) finish(false);
+      for (const remove of listeners) remove();
+      for (const dialog of ownedDialogs.reverse()) {if (dialog.open) dialog.close(); dialog.remove();}
+      if (embedded) {root.replaceChildren(); root.classList.remove('course-designer','editor-open');}
+    }
+  };
+  }
+  window.CourseDesigner = {mount};
+  if (document.body.hasAttribute('data-course-designer-standalone')) createDesigner(document);
 })();

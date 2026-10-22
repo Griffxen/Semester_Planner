@@ -6,35 +6,33 @@
   const entry = document.createElement('button');
   entry.id = 'deferred-button'; entry.type = 'button'; entry.dataset.icon = 'pause';
   $('#category-section').before(entry);
-  entry.onclick = () => {nextView = 'deferred'; render();};
+  entry.onclick = () => window.PlannerWorkspace ? PlannerWorkspace.show('deferred') : (workspacePage = 'deferred', render());
+  const page = document.createElement('section'); page.id = 'deferred-workspace'; page.hidden = true;
+  page.innerHTML = '<header class="workspace-heading"><div><h1>暂缓任务</h1><p>尚未安排日期的任务</p></div><button class="primary" type="button" data-new-deferred>新建任务</button></header><section class="deferred-workspace-panel"><div class="deferred-workspace-tools"><input type="search" id="deferred-search" placeholder="搜索暂缓任务…" aria-label="搜索暂缓任务"><span id="deferred-summary"></span></div><div id="deferred-board"></div></section>';
+  document.querySelector('main').append(page);
+  page.querySelector('[data-new-deferred]').onclick = () => openTask('', undefined);
+  $('#deferred-search').oninput = event => {$('#search').value = event.target.value; render();};
   const renderBefore = render;
   render = function () {
     if (!state) return;
-    if (state.readonly && nextView === 'deferred') nextView = 'week';
-    const deferredView = nextView === 'deferred';
-    // Existing renderers continue to receive only real, dated tasks.
-    if (deferredView) nextView = 'week';
-    try {renderBefore();} finally {if (deferredView) nextView = 'deferred';}
+    if (state.readonly && workspacePage === 'deferred') workspacePage = 'home';
+    const deferredView = workspacePage === 'deferred';
+    renderBefore();
     entry.hidden = !!state.readonly;
     entry.innerHTML = uiIcon('pause') + '<span>暂缓任务 · ' + (state.deferred_tasks || []).length + '</span>';
     entry.classList.toggle('selected', deferredView);
     entry.setAttribute('aria-pressed', String(deferredView));
-    $('#today-button').hidden = deferredView;
-    $('#show-courses').closest('label').hidden = deferredView;
     if (!deferredView) return;
     const rows = D.filtered(state, {category:filter,query:$('#search').value});
-    $('#week-navigation').hidden = true;
-    $('#hide-done').closest('label').hidden = true;
-    for (const id of ['nav-today','nav-week','nav-all']) {
-      $('#'+id).classList.remove('active'); $('#'+id).setAttribute('aria-pressed','false');
-    }
-    $('#filter-summary').textContent = (filter || '全部分类') + ' · ' + rows.length + ' 项暂缓任务';
-    $('#calendar').innerHTML = '<div class="board-heading"><h2>暂缓任务</h2></div>' + D.list(rows);
+    if ($('#deferred-search').value !== $('#search').value) $('#deferred-search').value = $('#search').value;
+    $('#deferred-summary').textContent = (filter || '全部分类') + ' · ' + rows.length + ' 项暂缓任务';
+    const markup = D.list(rows);
+    if ($('#deferred-board').innerHTML !== markup) $('#deferred-board').innerHTML = markup;
     $('#categories').querySelectorAll('[data-filter]').forEach(button => {
       button.querySelector('span').textContent = D.filtered(state,{category:button.dataset.filter}).length;
     });
   };
-  $('#calendar').addEventListener('click', event => {
+  $('#deferred-board').addEventListener('click', event => {
     const resume = event.target.closest('[data-resume-deferred]');
     const detail = event.target.closest('[data-deferred-task]');
     if (resume) editDeferred(resume.dataset.resumeDeferred, true);
@@ -67,7 +65,7 @@
     referenceTask = null; rescheduling = false; reference.innerHTML = '';
     openBefore(date, id, edit);
     if (!$('#task-dialog').open) return;
-    taskForm.elements.deferred.value = !id && nextView === 'deferred' ? 'true' : 'false';
+    taskForm.elements.deferred.value = !id && workspacePage === 'deferred' ? 'true' : 'false';
     selector.hidden = !!editing?.done;
     syncMode(); resetBaseline();
   };
@@ -94,7 +92,7 @@
   }
   $('#task-dialog').addEventListener('close', () => {
     const resumed = referenceTask?.deferred && editing && state?.tasks.find(t => t.id === editing.id);
-    if (resumed) {nextView = 'today'; nextWeek = resumed.date; render();}
+    if (resumed) {if (window.PlannerWorkspace) PlannerWorkspace.show('home', {view:'today', date:resumed.date}); else {workspacePage = 'home'; nextView = 'today'; nextWeek = resumed.date; render();}}
   });
   const draftBefore = taskDraft;
   taskDraft = function () {

@@ -1,5 +1,6 @@
 /* Presentation layer over the frozen, compatible domain client. */
 const legacyApi=api,legacyConfirm=askConfirm;
+let workspacePage='home';
 let nextView=matchMedia('(max-width:700px)').matches?'today':'week',nextWeek=matchMedia('(max-width:700px)').matches?today():monday(today()),dayTab='agenda',categoryBaseline='',authPending=false;
 function monday(date){return add(date,-((new Date(date+'T12:00:00Z').getUTCDay()+6)%7))}
 function matchesTask(t){const q=$('#search').value.trim().toLocaleLowerCase();return (!filter||t.category===filter)&&(!$('#hide-done').checked||!t.done)&&(!q||[t.title,t.short_title,t.notes,...(t.milestones||[]).map(m=>m.label)].join(' ').toLocaleLowerCase().includes(q))}

@@ -137,9 +137,9 @@ class Handler(BaseHTTPRequestHandler):
                 '/mobile-entry.js':'mobile-entry.js'}
         for prefix,names in [('',('app.js','style.css','icon.svg','share.js','export.js','export.css','deferred.js','deferred.css','task-conflicts.js','task-conflicts.css','course-lists.js','course-lists.css')),
                              ('legacy/',('app.js','style.css','icon.svg','share.js','transition.css')),
-                             ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css','export-entry.js','deferred.js','modal-shell.js','modal-shell.css','dialog-effects.js','dialog-effects.css')),
+                             ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css','export-entry.js','deferred.js','modal-shell.js','modal-shell.css','dialog-effects.js','dialog-effects.css','workspace.js','workspace.css')),
                              ('m/',('app.js','domain.js','tasks.js','courses.js','manage.js','style.css','export-entry.js')),
-                             ('timetables/',('app.js','domain.js','style.css'))]:
+                             ('timetables/',('app.js','domain.js','style.css','embed.css'))]:
             assets.update({'/'+prefix+name:('mobile/' if prefix=='m/' else prefix)+name for name in names})
         if method=='GET' and path in assets:
             f=ROOT/'static'/assets[path]

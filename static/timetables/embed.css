@@ -1,0 +1,90 @@
+/* The shared stylesheet is also safe to load on the main workspace. */
+@import url('/timetables/style.css');
+.course-designer:not(body):not(dialog){container-name:course-designer;container-type:inline-size;min-width:0;width:100%;font:14px/1.6 system-ui,-apple-system,"Noto Sans CJK SC",sans-serif;color:var(--ink)}
+.course-designer:not(body)>main{margin:0;max-width:none;padding:0 0 24px}
+.course-designer .page-nav{margin-bottom:20px}
+.course-designer-modal{font:14px/1.6 system-ui,-apple-system,"Noto Sans CJK SC",sans-serif}
+.course-designer-modal.modal-view{box-sizing:border-box;width:min(560px,calc(100vw - 32px));max-width:100%;height:auto;max-height:calc(100dvh - 32px);padding:24px;overflow:auto}
+@container course-designer (max-width:1120px) and (min-width:761px){.course-designer main{padding:22px 18px 50px}
+.course-designer .designer-grid{grid-template-columns:190px minmax(330px,1fr)}
+.course-designer .slot-panel{position:static;grid-column:1/-1;max-width:750px}
+.course-designer .slot-panel form{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.course-designer .slot-panel form>p,.course-designer .slot-panel :is(#apply-slot,[data-designer-id="apply-slot"]),.course-designer .slot-panel .editor-actions{grid-column:1/-1}
+.course-designer .slot-card{padding:4px 2px}
+.course-designer .heading-actions{max-width:410px}}
+@container course-designer (max-width:760px){.course-designer .page-header{padding:12px 16px;min-height:62px}
+.course-designer .brand{font-size:17px;gap:8px}
+.course-designer .brand span{display:none}
+.course-designer .brand img{width:25px;height:25px}
+.course-designer .header-links{gap:10px;font-size:11px}
+.course-designer .header-links button{font-size:11px;padding:5px 8px}
+.course-designer main{padding:16px 12px 40px}
+.course-designer .page-nav{gap:3px;margin-bottom:23px}
+.course-designer .page-nav button{font-size:12px;padding:7px 9px}
+.course-designer .page-nav>a{font-size:10px;width:100%;margin:8px 0 0 8px}
+.course-designer .section-heading{align-items:start;gap:14px}
+.course-designer .section-heading h1{font-size:23px}
+.course-designer .section-heading>button{font-size:12px;padding:8px 10px;white-space:nowrap}
+.course-designer .designer-heading{display:block}
+.course-designer .heading-actions{justify-content:flex-start;margin-top:14px}
+.course-designer .heading-actions button{font-size:12px;padding:7px 11px}
+.course-designer .heading-actions>span{font-size:11px;margin-right:auto}
+.course-designer .tabs{gap:2px;flex-wrap:nowrap;overflow:auto}
+.course-designer .tabs button{font-size:12px;white-space:nowrap;padding:7px 9px}
+.course-designer .designer-grid{display:flex;flex-direction:column;gap:14px}
+.course-designer .course-list-panel,.course-designer .calendar-panel,.course-designer .slot-panel{width:100%}
+.course-designer .course-list-panel{order:2}
+.course-designer .calendar-panel{order:1;padding:16px}
+.course-designer .course-list-panel :is(#course-list,[data-designer-id="course-list"]){display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.course-designer .course-row{margin:0}
+.course-designer .course-select strong{font-size:12px}
+.course-designer .course-tools{display:flex;gap:10px;align-items:center}
+.course-designer .course-tools button{font-size:11px;flex-shrink:0}
+.course-designer .course-tools p{margin:0;font-size:10px}
+.course-designer .slot-panel{order:3;position:fixed;inset:0;margin:0;border:0;border-radius:0;z-index:20;overflow:auto;padding:20px 22px max(30px,env(safe-area-inset-bottom));display:none}
+.course-designer .slot-panel.mobile-open{display:block}
+.course-designer.editor-open{overflow:hidden}
+.course-designer .slot-panel :is(#close-editor,[data-designer-id="close-editor"]){display:block;width:35px;height:35px;font-size:20px;padding:0}
+.course-designer .slot-panel label{font-size:13px;margin:15px 0}
+.course-designer .slot-panel input,.course-designer .slot-panel select{font-size:16px;padding:10px}
+.course-designer .slot-panel :is(#apply-slot,[data-designer-id="apply-slot"]){padding:12px}
+.course-designer .editor-actions{gap:9px}
+.course-designer .editor-actions button{font-size:13px;padding:9px 10px}
+.course-designer .mobile-days{display:flex;justify-content:space-between;gap:5px;margin-top:15px}
+.course-designer .mobile-days button{flex:1;min-width:0;padding:7px 0;font-size:12px}
+.course-designer .mobile-days .active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.course-designer .week-grid{grid-template-columns:43px minmax(0,1fr);margin-top:11px}
+.course-designer .day-column:not(.mobile-active){display:none}
+.course-designer .grid-hour{height:94px;padding:4px}
+.course-designer .slot-card{padding:8px 10px;font-size:13px}
+.course-designer .slot-card strong{font-size:13px}
+.course-designer .slot-card span{font-size:11px}
+.course-designer .cell-add{opacity:.45;font-size:18px;padding:5px 10px}
+.course-designer .grid-day-head{height:44px;font-size:13px}
+.course-designer .grid-day-head small{font-size:10px}
+.course-designer .time-column .grid-hour{font-size:11px}
+.course-designer .calendar-panel .warning{font-size:11px}
+.course-designer .template-cards{grid-template-columns:1fr;gap:12px}
+.course-designer .template-card{padding:20px}
+.course-designer .settings-panel{padding:19px;width:100%}
+.course-designer .period-row{grid-template-columns:65px 1fr 1fr}
+.course-designer .period-row label:nth-child(2){grid-column:2/4}
+.course-designer .period-row label:nth-child(3){grid-column:1/2}
+.course-designer .period-row button{align-self:end;height:38px}
+.course-designer .holiday-row{grid-template-columns:1fr 1fr}
+.course-designer .holiday-row label:first-child{grid-column:1/-1}
+.course-designer .holiday-row button{grid-column:1/-1;justify-self:end}
+.course-designer .permission-row{grid-template-columns:1fr 74px 74px;gap:7px}
+.course-designer .permission-row label{font-size:10px}
+.course-designer .source-item{flex-wrap:wrap}
+.course-designer .source-item>div{flex-basis:100%}
+.course-designer dialog,dialog.course-designer{padding:22px 18px}
+.course-designer .dialog-actions button{font-size:12px}
+.course-designer .message{margin-top:8vh;padding:25px}
+.course-designer .message h1{font-size:24px}}
+/* The main site's old sidebar rules also target bare aside elements. */
+.next-ui .course-designer aside{left:auto;right:auto;bottom:auto;width:auto;display:block;background:var(--surface);border:1px solid var(--line);padding:16px;overflow:visible}
+.next-ui .course-designer .course-list-panel{position:static}
+.next-ui .course-designer aside button{margin:0}
+.next-ui .course-designer aside button:not(.course-select){width:auto}
+@container course-designer (max-width:760px){.next-ui .course-designer .slot-panel{inset:0;width:100%;padding:20px 22px max(30px,env(safe-area-inset-bottom))}}

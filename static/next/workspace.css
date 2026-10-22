@@ -1,0 +1,15 @@
+.next-ui .workspace-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:22px}
+.next-ui .workspace-heading h1{margin:0;font-size:27px}
+.next-ui .workspace-heading p{margin:7px 0 0;color:var(--muted);font-size:12px}
+.next-ui .workspace-heading button{font-size:13px}
+.next-ui .workspace-loading{padding:28px 4px;color:var(--muted);font-size:13px}
+.next-ui .deferred-workspace-panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.next-ui .deferred-workspace-tools{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.next-ui .deferred-workspace-tools input{width:min(320px,100%);font-size:13px}
+.next-ui .deferred-workspace-tools span{font-size:12px;color:var(--muted)}
+.next-ui #deferred-board .deferred-list{margin:0}
+.next-ui .next-sidebar #workspace-home,.next-ui .next-sidebar #workspace-courses,.next-ui .next-sidebar #deferred-button{display:flex;align-items:center;gap:9px;text-align:left}
+.next-ui .next-sidebar #workspace-home.selected,.next-ui .next-sidebar #workspace-courses.selected,.next-ui .next-sidebar #deferred-button.selected{background:var(--soft);color:var(--ink);font-weight:600}
+.next-ui .nav-tools #timetable-button{display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+.next-ui #course-design-workspace{min-width:0}
+@media(max-width:700px){.next-ui .workspace-heading{align-items:flex-start}.next-ui .workspace-heading h1{font-size:21px}.next-ui .deferred-workspace-panel{padding:12px}.next-ui .deferred-workspace-tools{gap:8px}.next-ui .next-sidebar #workspace-home,.next-ui .next-sidebar #workspace-courses{font-size:12px;padding:7px 8px}.next-ui .nav-tools #timetable-button .ui-icon{display:none}}
