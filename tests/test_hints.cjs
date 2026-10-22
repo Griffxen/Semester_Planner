@@ -18,10 +18,36 @@ const startingNow={...ongoing,start_time:'12:00'};
 assert.equal(ctx.taskTimeHints([startingNow],now)[0].points[0].kind,'start','A start exactly at now remains visible');
 const pastNode={...ongoing,milestones:[{label:'未完成节点',stop_at:'2026-10-01T08:00+08:00'}]};
 assert.equal(ctx.taskTimeHints([pastNode],now)[0].points[0].kind,'milestone','Past unfinished milestones remain visible');
+
+const overdueEnd={...ongoing,id:'end',end_date:'2026-10-14',end_time:'11:00'};
+const overdueDue={...ongoing,id:'due',due:'2026-10-14T10:00'};
+const overdueNode={...ongoing,id:'node',milestones:[{label:'未完成',stop_at:'2026-10-14T09:00+08:00'}]};
+const overdue=ctx.overdueTaskGroups([overdueEnd,overdueDue,overdueNode],now);
+assert.deepEqual(Array.from(overdue,group=>group.task.id),['node','due','end'],'Groups sort by their earliest overdue point');
+assert.deepEqual(Array.from(overdue,group=>group.points[0].kind),['milestone','due','end']);
+assert.equal(ctx.overdueTaskGroups([ongoing,startingNow,startingSoon],now).length,0,'Past and future starts do not make tasks overdue');
+assert.equal(ctx.overdueTaskGroups([{...overdueDue,done:true},{...overdueNode,milestones:overdueNode.milestones.map(node=>({...node,done:true}))}],now).length,0,'Completed tasks and nodes are excluded');
+const multiple={...overdueEnd,id:'multiple',due:overdueDue.due,milestones:overdueNode.milestones};
+const multipleGroups=ctx.overdueTaskGroups([multiple],now);
+assert.equal(multipleGroups.length,1,'Several overdue reasons remain one task group');
+assert.deepEqual(Array.from(multipleGroups[0].points,point=>point.kind),['milestone','due','end'],'Points sort by overdue time');
+assert.deepEqual(Array.from(ctx.overdueTaskGroups([{...overdueDue,id:'b'},{...overdueDue,id:'a'}],now),group=>group.task.id),['a','b'],'Equal times sort by task ID');
+assert.equal(ctx.overdueTaskGroups([{...overdueEnd,continues_after:true}],now).length,0,'A clipped sharing end is not an actual overdue end');
+assert.deepEqual(Array.from(ctx.overdueTaskGroups([{...overdueEnd,continues_after:true,due:overdueDue.due}],now)[0].points,point=>point.kind),['due'],'A real deadline remains overdue despite a clipped end');
+const exactNow={...overdueEnd,end_time:'12:00',due:'2026-10-14T12:00',milestones:[{stop_at:'2026-10-14T12:00+08:00'}]};
+assert.equal(ctx.overdueTaskGroups([exactNow],now).length,0,'A point exactly at now is not overdue');
+assert.equal(ctx.overdueTaskGroups([exactNow],now+1)[0].points.length,3,'All three point types become overdue strictly after their time');
+const dateOnlyEnd={...ongoing,id:'date-only-end',end_date:'2026-10-14',end_time:''};
+const dateOnlyBoundary=Date.parse('2026-10-14T23:59+08:00');
+assert.equal(ctx.overdueTaskGroups([dateOnlyEnd],now).length,0,'Date-only ends are not overdue during the day');
+assert.equal(ctx.overdueTaskGroups([dateOnlyEnd],dateOnlyBoundary).length,0,'Date-only ends default to 23:59 Beijing time');
+assert.equal(ctx.overdueTaskGroups([dateOnlyEnd],dateOnlyBoundary+1)[0].points[0].dateOnly,true);
+
 const courses=[{name:'当前',date:'2026-10-14',time:'11:00–13:00'},{name:'之后',date:'2026-10-14',time:'14:00–16:00'},{name:'已取消',date:'2026-10-14',time:'12:30–13:30',cancelled:true}];
 const hint=ctx.courseTimeHints(courses,now);assert.equal(hint.current.length,1);assert.equal(hint.next.course.name,'之后');assert.equal(ctx.courseTimeHints([],now).next,null);
 assert.equal(ctx.courseTimeHints(courses,Date.parse('2026-10-14T13:00+08:00')).current.length,0);
 console.log('Past unfinished + future 12h, completed exclusion, grouping and course selection passed');
+console.log('Overdue task grouping, sharing boundaries and Beijing-time cutoffs passed');
 
 const nodeTasks=[{id:'long',date:'2026-10-01',end_date:'2026-10-10',milestones:[{label:'计划外节点',stop_at:'2026-10-16T10:00+08:00',done:false},{label:'已完成节点',stop_at:'2026-10-16T09:00+08:00',done:true}]},{id:'short',date:'2026-10-16',end_date:'2026-10-16',milestones:[{label:'短任务节点',stop_at:'2026-10-16T11:00+08:00',done:false}]}];
 assert.deepEqual(Array.from(ctx.calendarMilestones(nodeTasks,'2026-10-16'),x=>x.node.label),['已完成节点','计划外节点','短任务节点']);

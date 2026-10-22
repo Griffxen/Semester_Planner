@@ -16,6 +16,15 @@ function taskTimeHints(tasks, now) {
     return {task, points, nearest: points.length ? Math.min(...points.map(p => Math.abs(p.ms - now))) : Infinity};
   }).filter(x => x.points.length).sort((a, b) => a.nearest - b.nearest || String(a.task.id).localeCompare(String(b.task.id)));
 }
+
+// Group actual unfinished past points without treating clipped sharing ends as due.
+function overdueTaskGroups(tasks, now) {
+  return taskTimeHints(tasks, now).map(({task, points}) => ({
+    task,
+    points: points.filter(point => point.ms < now && point.kind !== 'start' && !(point.kind === 'end' && task.continues_after))
+  })).filter(group => group.points.length)
+    .sort((a, b) => a.points[0].ms - b.points[0].ms || String(a.task.id).localeCompare(String(b.task.id)));
+}
 function courseTimeHints(courses,now){const rows=courses.filter(c=>!c.cancelled).map(course=>{const times=course.time.match(/\d{2}:\d{2}/g)||[];return {course,start:Date.parse(course.date+'T'+times[0]+'+08:00'),end:Date.parse(course.date+'T'+times[1]+'+08:00')}}).filter(x=>Number.isFinite(x.start)&&Number.isFinite(x.end));return {current:rows.filter(x=>x.start<=now&&now<x.end).sort((a,b)=>a.end-b.end),next:rows.filter(x=>x.start>now).sort((a,b)=>a.start-b.start)[0]||null}}
 
 // Calendar entries belong to node dates, independent of the parent task range.
