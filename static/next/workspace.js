@@ -27,6 +27,19 @@
   function restoreFolds() {
     $('#calendar').querySelectorAll('details[id]').forEach(node => {if (records.home.folds.has(node.id)) node.open = records.home.folds.get(node.id);});
   }
+  let homeLayoutFrame = 0;
+  function scheduleHomeLayout() {
+    cancelAnimationFrame(homeLayoutFrame);
+    if (workspacePage !== 'home' || home.hidden) return;
+    homeLayoutFrame = requestAnimationFrame(() => {
+      homeLayoutFrame = 0;
+      if (workspacePage !== 'home' || home.hidden) return;
+      setToolbarHeight(); layoutRanges();
+    });
+  }
+  $('#calendar').addEventListener('toggle', event => {
+    if (event.target.matches('details.semester-week') && event.target.open) scheduleHomeLayout();
+  }, true);
   function panels() {
     home.hidden = workspacePage !== 'home'; design.hidden = workspacePage !== 'courses'; deferred.hidden = workspacePage !== 'deferred';
     designEntry.hidden = !!state?.readonly;
@@ -117,7 +130,7 @@
       workspacePage = 'home';restoreFilters('home');updateUrl('home',null,true);
     } else if (!state.readonly && previewReturn) {workspacePage = previewReturn;previewReturn = null;restoreFilters(workspacePage);updateUrl(workspacePage,null,true);}
     if (!restoring && displayed === 'home' && workspacePage === 'home') records.home.folds = new Map([...$('#calendar').querySelectorAll('details[id]')].map(node => [node.id,node.open]));
-    previousRender(...args);restoreFolds();panels();displayed = workspacePage;
+    previousRender(...args);restoreFolds();panels();displayed = workspacePage;scheduleHomeLayout();
   };
   const oldConfirm = askConfirm;
   askConfirm = function (message,...args) {
