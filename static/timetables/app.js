@@ -239,9 +239,12 @@
       !D.holidayAt(courseHolidays(item.first.course, item.first.slot), D.dateAtWeek(start, week, item.first.slot.day)).length &&
       !D.holidayAt(courseHolidays(item.second.course, item.second.slot), D.dateAtWeek(start, week, item.second.slot.day)).length);
     const badIds = new Set(collisions.flatMap(item => [item.first.slot.slot_id, item.second.slot.slot_id]));
-    const range = items.flatMap(item => D.timeRange(item.slot).map(time => Math.floor(D.minutes(time) / 60))).filter(Number.isFinite);
-    const firstHour = Math.min(7, ...range), lastHour = Math.min(23, Math.max(20, ...range));
-    const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i);
+    const dayItems = days.map((_, index) => D.layoutDay(items.filter(item => Number(item.slot.day) === index + 1)));
+    const positioned = dayItems.flat();
+    const firstHour = Math.min(7, ...positioned.map(item => Math.floor(item.startMinute / 60)));
+    const endHour = Math.min(24, Math.max(21, ...positioned.map(item => Math.ceil(item.endMinute / 60))));
+    const hours = Array.from({ length: endHour - firstHour }, (_, i) => firstHour + i);
+    const axisStart = firstHour * 60, axisMinutes = (endHour - firstHour) * 60;
     const date = D.dateAtWeek(start, week, 1), endDate = D.dateAtWeek(start, week, 7);
     $('#preview-caption').textContent = date ? `${date} 至 ${endDate} · ${week % 2 ? '单周' : '双周'} · ${items.length} 个时段` : `第 ${week} 教学周 · ${week % 2 ? '单周' : '双周'} · ${items.length} 个时段`;
     $('#week-conflicts').hidden = !collisions.length;
@@ -250,17 +253,25 @@
     let html = `<div class="time-column"><div class="grid-day-head">时间</div>${hours.map(hour => `<div class="grid-hour">${String(hour).padStart(2, '0')}:00</div>`).join('')}</div>`;
     for (let day = 1; day <= 7; day++) {
       const date = D.dateAtWeek(start, week, day), holidays = personal ? [] : D.holidayAt(plan.holidays, date);
-      html += `<div class="day-column ${selectedDay === day ? 'mobile-active' : ''}"><div class="grid-day-head ${holidays.length ? 'holiday' : ''}"><strong>星期${days[day - 1]}</strong><small>${esc(holidays.length ? holidays.map(item => item.name).join('、') : date.slice(5))}</small></div>`;
+      html += `<div class="day-column ${selectedDay === day ? 'mobile-active' : ''}"><div class="grid-day-head ${holidays.length ? 'holiday' : ''}"><strong>星期${days[day - 1]}</strong><small>${esc(holidays.length ? holidays.map(item => item.name).join('、') : date.slice(5))}</small></div><div class="day-timeline">`;
       for (const hour of hours) {
-        const matches = items.filter(item => Number(item.slot.day) === day && Math.floor(D.minutes(D.timeRange(item.slot)[0]) / 60) === hour);
-        html += `<div class="grid-hour">${canEdit() ? `<button type="button" class="cell-add" data-cell-day="${day}" data-cell-time="${String(hour).padStart(2, '0')}:00" aria-label="星期${days[day - 1]} ${hour}点添加时段">＋</button>` : ''}<div class="slot-stack">${matches.map(({ course, slot }) => {
-          const cancelled = D.holidayAt(courseHolidays(course, slot), date).length > 0;
-          return `<button type="button" class="slot-card ${course.course_id === selectedCourse ? 'selected' : ''} ${badIds.has(slot.slot_id) ? 'conflict' : ''} ${cancelled ? 'suppressed' : ''}" data-slot="${esc(slot.slot_id)}" data-course="${esc(course.course_id)}" title="${esc(`${course.name} · ${slot.time} · ${D.weekLabel(slot)}${cancelled ? ' · 停课日期' : ''}`)}"><strong>${esc(course.name)}</strong><span>${esc(slot.time)}</span><span>${esc(slot.room || '地点待定')}</span><span>${esc(D.weekLabel(slot))}${cancelled ? ' · 停课' : ''}</span></button>`;
-        }).join('')}</div></div>`;
+        html += `<div class="grid-hour">${canEdit() ? `<button type="button" class="cell-add" data-cell-day="${day}" data-cell-time="${String(hour).padStart(2, '0')}:00" aria-label="星期${days[day - 1]} ${hour}点添加时段">＋</button>` : ''}</div>`;
       }
-      html += '</div>';
+      html += `<div class="slot-layer">${dayItems[day - 1].map(({ course, slot }) => {
+        const cancelled = D.holidayAt(courseHolidays(course, slot), date).length > 0;
+        const label = `${course.name} · ${slot.time} · ${slot.room || '地点待定'} · ${D.weekLabel(slot)}${cancelled ? ' · 停课日期' : ''}`;
+        return `<button type="button" class="slot-card ${course.course_id === selectedCourse ? 'selected' : ''} ${badIds.has(slot.slot_id) ? 'conflict' : ''} ${cancelled ? 'suppressed' : ''}" data-slot="${esc(slot.slot_id)}" data-course="${esc(course.course_id)}" title="${esc(label)}" aria-label="${esc(label)}"><span class="slot-content"><strong>${esc(course.name)}</strong><span>${esc(slot.time)}</span><span>${esc(slot.room || '地点待定')}</span><span>${esc(D.weekLabel(slot))}${cancelled ? ' · 停课' : ''}</span></span></button>`;
+      }).join('')}</div></div></div>`;
     }
     $('#week-grid').innerHTML = html;
+    // CSSOM keeps dynamic geometry compatible with the site's strict style-src policy.
+    $$('#week-grid .slot-card').forEach((card, index) => {
+      const { startMinute, endMinute, column, columnCount } = positioned[index];
+      card.style.setProperty('--slot-top', `${(startMinute - axisStart) / axisMinutes * 100}%`);
+      card.style.setProperty('--slot-height', `${(endMinute - startMinute) / axisMinutes * 100}%`);
+      card.style.setProperty('--slot-left', `${column / columnCount * 100}%`);
+      card.style.setProperty('--slot-width', `${100 / columnCount}%`);
+    });
   }
   function closeEditor() {
     $('#editor-panel').classList.remove('mobile-open'); editorScope.classList.remove('editor-open');

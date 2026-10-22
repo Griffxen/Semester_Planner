@@ -10,7 +10,7 @@
 .course-designer .slot-panel{position:static;grid-column:1/-1;max-width:750px}
 .course-designer .slot-panel form{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 .course-designer .slot-panel form>p,.course-designer .slot-panel :is(#apply-slot,[data-designer-id="apply-slot"]),.course-designer .slot-panel .editor-actions{grid-column:1/-1}
-.course-designer .slot-card{padding:4px 2px}
+.course-designer .slot-card .slot-content{padding:4px 2px}
 .course-designer .heading-actions{max-width:410px}}
 @container course-designer (max-width:760px){.course-designer .page-header{padding:12px 16px;min-height:62px}
 .course-designer .brand{font-size:17px;gap:8px}
@@ -53,10 +53,11 @@
 .course-designer .mobile-days{display:flex;justify-content:space-between;gap:5px;margin-top:15px}
 .course-designer .mobile-days button{flex:1;min-width:0;padding:7px 0;font-size:12px}
 .course-designer .mobile-days .active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.course-designer .week-grid{grid-template-columns:43px minmax(0,1fr);margin-top:11px}
+.course-designer .week-grid{--hour-height:94px;grid-template-columns:43px minmax(0,1fr);margin-top:11px}
 .course-designer .day-column:not(.mobile-active){display:none}
-.course-designer .grid-hour{height:94px;padding:4px}
-.course-designer .slot-card{padding:8px 10px;font-size:13px}
+.course-designer .grid-hour{padding:4px}
+.course-designer .slot-card{font-size:13px}
+.course-designer .slot-card .slot-content{padding:8px 10px}
 .course-designer .slot-card strong{font-size:13px}
 .course-designer .slot-card span{font-size:11px}
 .course-designer .cell-add{opacity:.45;font-size:18px;padding:5px 10px}

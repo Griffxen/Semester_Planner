@@ -32,6 +32,29 @@
       (course.slots || []).filter(slot => activeInWeek(slot, week)).map(slot => ({ course, slot }))
     ).sort((a, b) => Number(a.slot.day) - Number(b.slot.day) || timeRange(a.slot)[0].localeCompare(timeRange(b.slot)[0]) || a.course.name.localeCompare(b.course.name));
   }
+  function layoutDay(items) {
+    const result = (items || []).map(({ course, slot }) => {
+      const [startMinute, endMinute] = timeRange(slot).map(minutes);
+      return { course, slot, startMinute, endMinute };
+    }).filter(item => Number.isFinite(item.startMinute) && Number.isFinite(item.endMinute) && item.startMinute < item.endMinute)
+      .sort((a, b) => a.startMinute - b.startMinute || a.endMinute - b.endMinute || String(a.slot.slot_id || '').localeCompare(String(b.slot.slot_id || '')));
+    let group = [], columnEnds = [], groupEnd = -Infinity;
+    const finishGroup = () => {
+      for (const item of group) item.columnCount = columnEnds.length;
+    };
+    for (const item of result) {
+      if (item.startMinute >= groupEnd) {
+        finishGroup(); group = []; columnEnds = []; groupEnd = -Infinity;
+      }
+      const available = columnEnds.findIndex(end => end <= item.startMinute);
+      item.column = available < 0 ? columnEnds.length : available;
+      columnEnds[item.column] = item.endMinute;
+      groupEnd = Math.max(groupEnd, item.endMinute);
+      group.push(item);
+    }
+    finishGroup();
+    return result;
+  }
   function conflicts(courses, week) {
     const items = slotsForWeek(courses, week), result = [];
     for (let i = 0; i < items.length; i++) {
@@ -164,5 +187,5 @@
   function holidayAt(holidays, date) {
     return date ? (holidays || []).filter(item => item.start <= date && item.end >= date) : [];
   }
-  return { clone, minutes, timeRange, activeInWeek, weekLabel, slotsForWeek, conflicts, allConflicts, validateSlot, validatePeriods, resolvePeriods, periodsForSlot, updatePeriods, candidates, mergeCourses, splitSlot, dateAtWeek, holidayAt };
+  return { clone, minutes, timeRange, activeInWeek, weekLabel, slotsForWeek, layoutDay, conflicts, allConflicts, validateSlot, validatePeriods, resolvePeriods, periodsForSlot, updatePeriods, candidates, mergeCourses, splitSlot, dateAtWeek, holidayAt };
 });

@@ -76,24 +76,27 @@ body.course-designer-page{margin:0;font:14px/1.6 system-ui,-apple-system,"Noto S
 .course-designer .preview-heading{margin-bottom:7px}
 .course-designer .preview-heading label{display:flex;flex-direction:row;align-items:center;gap:6px;margin:0;font-size:12px;white-space:nowrap}
 .course-designer .preview-heading select{width:auto;padding:4px 6px}
-.course-designer .week-grid{display:grid;grid-template-columns:42px repeat(7,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);margin-top:15px;min-width:0}
+.course-designer .week-grid{--hour-height:120px;display:grid;grid-template-columns:42px repeat(7,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);margin-top:15px;min-width:0}
 .course-designer .time-column,.course-designer .day-column{min-width:0}
 .course-designer .grid-day-head,.course-designer .grid-hour{border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
 .course-designer .grid-day-head{height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;background:var(--surface-muted)}
 .course-designer .grid-day-head small{font-size:9px;color:var(--muted)}
 .course-designer .grid-day-head.holiday{color:var(--warning-ink);background:var(--warning-bg)}
-.course-designer .grid-hour{height:120px;padding:3px;position:relative;overflow:auto}
+.course-designer .grid-hour{height:var(--hour-height);padding:3px;position:relative}
 .course-designer .time-column .grid-hour{padding-top:5px;color:var(--muted);font-size:10px;text-align:center;overflow:hidden}
 .course-designer .cell-add{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;background:transparent;color:var(--muted);padding:0;font-size:14px;text-align:right;align-content:end;opacity:0}
 .course-designer .grid-hour:hover .cell-add,.course-designer .cell-add:focus-visible{opacity:1}
-.course-designer .slot-stack{position:relative;display:flex;gap:3px;align-items:stretch;pointer-events:none}
-.course-designer .slot-card{position:relative;min-width:0;flex:1;text-align:left;padding:6px 4px;background:var(--course-bg);color:var(--course-ink);border:1px solid transparent;border-left:3px solid var(--course-ink);border-radius:5px;pointer-events:auto;font-size:10px;overflow-wrap:anywhere}
+.course-designer .day-timeline{position:relative;isolation:isolate}
+.course-designer .slot-layer{position:absolute;inset:0;pointer-events:none}
+.course-designer .slot-card{position:absolute;top:var(--slot-top);height:var(--slot-height);left:calc(var(--slot-left) + 3px);width:calc(var(--slot-width) - 6px);min-width:0;min-height:0;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;margin:0;text-align:left;padding:0;background:var(--course-bg);color:var(--course-ink);border:0;border-left:3px solid var(--course-ink);border-radius:5px;pointer-events:auto;font-size:10px;overflow:hidden;overflow-wrap:anywhere}
 .course-designer .slot-card:hover:not(:disabled){background:var(--course-bg);filter:brightness(.96)}
+.course-designer .slot-card .slot-content{flex-shrink:0;padding:6px 4px;font:inherit;line-height:1.5}
 .course-designer .slot-card strong{display:block;font-weight:600;font-size:10px}
 .course-designer .slot-card span{display:block;font-size:9px;line-height:1.5}
-.course-designer .slot-card.selected{border-color:var(--course-ink)}
-.course-designer .slot-card.conflict{border-bottom:2px solid var(--warning-ink)}
+.course-designer .slot-card.selected{outline:1px solid var(--course-ink);outline-offset:-1px}
+.course-designer .slot-card.conflict{box-shadow:inset 0 -2px 0 var(--warning-ink)}
 .course-designer .slot-card.suppressed{opacity:.55;border-left-style:dashed}
+.course-designer .slot-card:focus-visible{outline:2px solid var(--accent);outline-offset:1px;z-index:1}
 .course-designer .calendar-help{margin-top:13px}
 .course-designer .slot-panel{position:sticky;top:18px}
 .course-designer .slot-panel label{font-size:11px;margin:11px 0}
@@ -145,14 +148,14 @@ body.course-designer-page{margin:0;font:14px/1.6 system-ui,-apple-system,"Noto S
 @media(min-width:1400px){.course-designer .designer-grid{grid-template-columns:250px minmax(480px,1fr) 320px}
 .course-designer .slot-card strong{font-size:12px}
 .course-designer .slot-card span{font-size:10px}
-.course-designer .grid-hour{height:115px}}
+.course-designer .week-grid{--hour-height:115px}}
 
 @media(max-width:1120px) and (min-width:761px){.course-designer main{padding:22px 18px 50px}
 .course-designer .designer-grid{grid-template-columns:190px minmax(330px,1fr)}
 .course-designer .slot-panel{position:static;grid-column:1/-1;max-width:750px}
 .course-designer .slot-panel form{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 .course-designer .slot-panel form>p,.course-designer .slot-panel :is(#apply-slot,[data-designer-id="apply-slot"]),.course-designer .slot-panel .editor-actions{grid-column:1/-1}
-.course-designer .slot-card{padding:4px 2px}
+.course-designer .slot-card .slot-content{padding:4px 2px}
 .course-designer .heading-actions{max-width:410px}}
 
 @media(max-width:760px){.course-designer .page-header{padding:12px 16px;min-height:62px}
@@ -196,10 +199,11 @@ body.course-designer-page{margin:0;font:14px/1.6 system-ui,-apple-system,"Noto S
 .course-designer .mobile-days{display:flex;justify-content:space-between;gap:5px;margin-top:15px}
 .course-designer .mobile-days button{flex:1;min-width:0;padding:7px 0;font-size:12px}
 .course-designer .mobile-days .active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.course-designer .week-grid{grid-template-columns:43px minmax(0,1fr);margin-top:11px}
+.course-designer .week-grid{--hour-height:94px;grid-template-columns:43px minmax(0,1fr);margin-top:11px}
 .course-designer .day-column:not(.mobile-active){display:none}
-.course-designer .grid-hour{height:94px;padding:4px}
-.course-designer .slot-card{padding:8px 10px;font-size:13px}
+.course-designer .grid-hour{padding:4px}
+.course-designer .slot-card{font-size:13px}
+.course-designer .slot-card .slot-content{padding:8px 10px}
 .course-designer .slot-card strong{font-size:13px}
 .course-designer .slot-card span{font-size:11px}
 .course-designer .cell-add{opacity:.45;font-size:18px;padding:5px 10px}
