@@ -75,8 +75,12 @@ class Courses(unittest.TestCase):
         template=self.req('timetable')[1]
         holiday=dict(name='国庆',start='2026-10-01',end='2026-10-07')
         self.assertEqual(self.req('timetable','PUT',{**template,'holidays':[holiday]})[0],200)
+        # Template edits affect a personal snapshot only after an explicit update.
+        self.assertTrue(any('2026-10-01'<=c['date']<='2026-10-07' and not c['cancelled'] for c in self.req('state')[1]['course_dates']))
+        self.assertEqual(self.req('timetable','POST',{})[0],200)
         state=self.req('state')[1]
-        self.assertFalse(any('2026-10-01'<=c['date']<='2026-10-07' for c in state['course_dates']))
+        self.assertFalse(any('2026-10-01'<=c['date']<='2026-10-07' and not c['cancelled'] for c in state['course_dates']))
+        self.assertTrue(any(c.get('holiday') and c['cancelled'] for c in state['course_dates']))
         self.assertTrue(any(c['date']=='2026-09-30' for c in state['course_dates']))
         self.assertTrue(any(c['date']=='2026-10-08' for c in state['course_dates']))
         self.assertEqual(self.req('timetable','PUT',{**template,'holidays':[{**holiday,'end':'2026-09-30'}]})[0],400)
@@ -84,7 +88,7 @@ class Courses(unittest.TestCase):
         self.req('logout','POST',{});self.login('bob','other-password-123')
         self.assertEqual(self.req('timetable','PUT',template)[0],403)
         self.req('timetable','POST',{})
-        self.assertFalse(any('2026-10-01'<=c['date']<='2026-10-07' for c in self.req('state')[1]['course_dates']))
+        self.assertFalse(any('2026-10-01'<=c['date']<='2026-10-07' and not c['cancelled'] for c in self.req('state')[1]['course_dates']))
 
     def test_personal_changes_survive_import_and_restore(self):
         template=self.req('timetable')[1];course=dict(template['courses'][1])

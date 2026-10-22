@@ -4,7 +4,8 @@ from pathlib import Path
 from sharing import init_sharing, DEFAULT_POLICY, validate_policy, private_state, shared_state, drop_category_permissions
 from dashboard_api import agenda as dashboard_agenda, meta as dashboard_meta
 from exporting import project_export
-from courses import migrate_ids, with_ids, occurs, is_holiday
+from courses import migrate_ids
+import course_plans
 ROOT=Path(__file__).resolve().parent
 DB=Path(os.environ.get('PLANNER_DB', ROOT/'data/planner.db'))
 def validate_milestones(raw):
@@ -88,6 +89,7 @@ def init():
         init_sharing(c)
         for u in c.execute('SELECT id FROM users').fetchall():
             ensure_categories(c,u['id'])
+        course_plans.init(c)
 def ensure_categories(c,uid):
     if not c.execute('SELECT 1 FROM categories WHERE user_id=?',(uid,)).fetchone():
         c.executemany('INSERT INTO categories(user_id,name,color) VALUES(?,?,?)',[(uid,n,k) for n,k in [('课程','#7185bd'),('科研','#408f80'),('考试','#b88355'),('个人','#9775ae')]])
@@ -131,11 +133,13 @@ class Handler(BaseHTTPRequestHandler):
         assets={'/':'next/index.html', '/next':'next/index.html', '/next/':'next/index.html',
                 '/legacy':'legacy/index.html', '/legacy/':'legacy/index.html',
                 '/m':'mobile/index.html', '/m/':'mobile/index.html',
+                '/timetables':'timetables/index.html', '/timetables/':'timetables/index.html',
                 '/mobile-entry.js':'mobile-entry.js'}
         for prefix,names in [('',('app.js','style.css','icon.svg','share.js','export.js','export.css','deferred.js','deferred.css','task-conflicts.js','task-conflicts.css')),
                              ('legacy/',('app.js','style.css','icon.svg','share.js','transition.css')),
                              ('next/',('app.js','style.css','icons.js','hints.js','theme.js','paint.css','workload.js','workload.css','export-entry.js','deferred.js','modal-shell.js','modal-shell.css','dialog-effects.js','dialog-effects.css')),
-                             ('m/',('app.js','domain.js','tasks.js','courses.js','manage.js','style.css','export-entry.js'))]:
+                             ('m/',('app.js','domain.js','tasks.js','courses.js','manage.js','style.css','export-entry.js')),
+                             ('timetables/',('app.js','domain.js','style.css'))]:
             assets.update({'/'+prefix+name:('mobile/' if prefix=='m/' else prefix)+name for name in names})
         if method=='GET' and path in assets:
             f=ROOT/'static'/assets[path]
@@ -146,7 +150,8 @@ class Handler(BaseHTTPRequestHandler):
         if method!='GET':
             if self.headers.get('Content-Type','').split(';')[0]!='application/json': self.send(415,{'error':'需要 JSON 请求'}); return
             length=int(self.headers.get('Content-Length','0'))
-            if length>65536: self.send(413,{'error':'请求过大'}); return
+            course_request=path.startswith(('/api/timetables','/api/course-plan'))
+            if length>(262144 if course_request else 65536): self.send(413,{'error':'请求过大'}); return
             data=json.loads(self.rfile.read(length) or b'{}')
             if not isinstance(data,dict): raise ValueError()
         with connect() as c:
@@ -181,6 +186,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(401,{'error':'展示账户已停用，请退出'});return
             if viewer and (path,method) not in {('/api/state','GET'),('/api/view-export','GET'),('/api/export-preview','POST'),('/api/password','POST'),('/api/username','POST'),('/api/logout','POST')}:
                 self.send(403,{'error':'展示账户只能查看获准分享的内容'});return
+            course_response=course_plans.route(c,actor,method,path,data)
+            if course_response is not None:
+                self.send(*course_response);return
             if path=='/api/export-preview' and method=='POST':
                 if not isinstance(data,dict):raise ValueError()
                 target=viewer
@@ -314,66 +322,6 @@ class Handler(BaseHTTPRequestHandler):
                     try:c.execute('INSERT INTO journal VALUES(?,?,?,1)',(uid,date,body))
                     except sqlite3.IntegrityError:self.send(409,{'error':'手记已在其他页面创建，请刷新'});return
                 self.send(200,{'ok':True});return
-            if path=='/api/timetable' and method=='GET':
-                self.send(200,{'courses':json.loads(c.execute('SELECT data FROM timetable_template WHERE id=1').fetchone()[0]),'holidays':json.loads(c.execute('SELECT data FROM holidays WHERE id=1').fetchone()[0])});return
-            if path=='/api/timetable' and method=='POST':
-                raw=c.execute('SELECT data FROM timetable_template WHERE id=1').fetchone()[0]
-                c.execute('INSERT OR REPLACE INTO user_timetable VALUES(?,?)',(uid,raw));self.send(200,{'ok':True});return
-            if path=='/api/timetable' and method=='PUT':
-                if not c.execute('SELECT admin FROM users WHERE id=?',(uid,)).fetchone()[0]:self.send(403,{'error':'仅管理员可编辑公共课表'});return
-                courses=data.get('courses')
-                if not isinstance(courses,list) or len(courses)>100:raise ValueError()
-                for x in courses:
-                    if not isinstance(x,dict) or not all(isinstance(x.get(k),str) and len(x[k])<=120 for k in ('name','room','time')) or not x['name'].strip():raise ValueError()
-                    if x.get('weeks') not in ('all','odd','even') or not isinstance(x.get('day'),int) or not 1<=x['day']<=7:raise ValueError()
-                    if not isinstance(x.get('start'),int) or not isinstance(x.get('end'),int) or not 1<=x['start']<=x['end']<=18:raise ValueError()
-                holidays=data.get('holidays',json.loads(c.execute('SELECT data FROM holidays WHERE id=1').fetchone()[0]))
-                if not isinstance(holidays,list) or len(holidays)>100:raise ValueError()
-                for x in holidays:
-                    if not isinstance(x,dict) or not isinstance(x.get('name'),str) or not 1<=len(x['name'].strip())<=60:raise ValueError()
-                    start=dt.date.fromisoformat(x.get('start','')).isoformat();end=dt.date.fromisoformat(x.get('end','')).isoformat()
-                    if end<start:raise ValueError()
-                    x.update(name=x['name'].strip(),start=start,end=end)
-                previous=json.loads(c.execute('SELECT data FROM timetable_template WHERE id=1').fetchone()[0])
-                courses=with_ids(courses,previous)
-                c.execute('UPDATE timetable_template SET data=? WHERE id=1',(json.dumps(courses,ensure_ascii=False),))
-                c.execute('UPDATE holidays SET data=? WHERE id=1',(json.dumps(holidays,ensure_ascii=False),));self.send(200,{'ok':True});return
-            if path=='/api/course-annotations' and method=='PUT':
-                key=data.get('course_key');date=dt.date.fromisoformat(data.get('date','')).isoformat()
-                timetable=json.loads((c.execute('SELECT data FROM user_timetable WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0])
-                course=next((x for x in timetable if x['course_id']==key),None)
-                semester=dt.date.fromisoformat(c.execute('SELECT start FROM settings WHERE user_id=?',(uid,)).fetchone()[0])
-                changes=json.loads((c.execute('SELECT data FROM user_course_exceptions WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0])
-                saved=c.execute('SELECT homework_done FROM course_annotations WHERE user_id=? AND course_key=? AND date=?',(uid,key,date)).fetchone()
-                if not course or not (saved or occurs(course,semester,dt.date.fromisoformat(date)) or any(x['course_key']==key and x['date']==date for x in changes)):raise ValueError()
-                notes=data.get('notes','');required=data.get('homework_required',False);instructions=data.get('homework_notes','')
-                done=data.get('homework_done',bool(saved['homework_done']) if saved else False)
-                if not isinstance(notes,str) or len(notes)>4000 or type(required) is not bool or type(done) is not bool or not isinstance(instructions,str) or len(instructions)>4000:raise ValueError()
-                c.execute('INSERT OR REPLACE INTO course_annotations(user_id,course_key,date,notes,homework_required,homework_notes,homework_done) VALUES(?,?,?,?,?,?,?)',(uid,key,date,notes,required,instructions,done if required else False))
-                self.send(200,{'ok':True});return
-            if path=='/api/course-exceptions' and method=='PUT':
-                timetable=json.loads((c.execute('SELECT data FROM user_timetable WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0])
-                key=data.get('course_key');date=dt.date.fromisoformat(data.get('date','')).isoformat()
-                course=next((x for x in timetable if x['course_id']==key),None)
-                semester=dt.date.fromisoformat(c.execute('SELECT start FROM settings WHERE user_id=?',(uid,)).fetchone()[0])
-                cancelled=data.get('cancelled',False);new_date=data.get('new_date','');new_time=data.get('new_time','')
-                if type(cancelled) is not bool or not isinstance(new_date,str) or not isinstance(new_time,str) or len(new_time)>120:raise ValueError()
-                if new_date:new_date=dt.date.fromisoformat(new_date).isoformat()
-                if new_date and is_holiday(new_date,json.loads(c.execute('SELECT data FROM holidays WHERE id=1').fetchone()[0])):
-                    self.send(400,{'error':'所选日期为节假日，请选择其他日期'});return
-                if new_time:
-                    times=re.fullmatch(r'(\d{2}:\d{2})[–—-](\d{2}:\d{2})',new_time)
-                    if not times or times[1]>=times[2]:raise ValueError()
-                    for t in times.groups():dt.time.fromisoformat(t)
-                if cancelled and (new_date or new_time):raise ValueError()
-                old=json.loads((c.execute('SELECT data FROM user_course_exceptions WHERE user_id=?',(uid,)).fetchone() or ['[]'])[0])
-                existing=next((x for x in old if x['course_key']==key and x['date']==date),{})
-                old=[x for x in old if not (x['course_key']==key and x['date']==date)]
-                if cancelled or new_date or new_time:
-                    if not course or (not existing and not occurs(course,semester,dt.date.fromisoformat(date))):raise ValueError()
-                    old.append(dict(course_key=key,date=date,cancelled=cancelled,new_date=new_date,new_time=new_time,original_time=existing.get('original_time') or course['time']))
-                c.execute('INSERT OR REPLACE INTO user_course_exceptions VALUES(?,?)',(uid,json.dumps(old,ensure_ascii=False)))
-                self.send(200,{'ok':True});return
             if path in ('/api/password','/api/users','/api/username') and method=='POST':
                 actor=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
                 if path=='/api/users' and not actor['admin']:
@@ -425,6 +373,10 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/settings' and method=='PUT':
                 start=dt.date.fromisoformat(data['start']); name=str(data['name']).strip()
                 if start.weekday()!=0 or not 1<=len(name)<=80: raise ValueError()
+                previous_start=c.execute('SELECT start FROM settings WHERE user_id=?',(uid,)).fetchone()['start']
+                if previous_start!=start.isoformat():
+                    course_plans.preserve_occurrences(c,uid,previous_start)
+                    course_plans.bump_version(c,uid)
                 c.execute('UPDATE settings SET name=?,start=? WHERE user_id=?',(name,start.isoformat(),uid)); self.send(200,{'ok':True}); return
             if path=='/api/tasks' and method=='POST' or path.startswith('/api/tasks/') and method=='PUT':
                 existing=c.execute('SELECT * FROM tasks WHERE id=? AND user_id=?',(path.rsplit('/',1)[1],uid)).fetchone() if method=='PUT' else None

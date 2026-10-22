@@ -25,6 +25,10 @@ def with_ids(courses, previous=()):
 
 
 def migrate_ids(c):
+    # Once v2 is installed these tables are compatibility mirrors. Reassigning
+    # their IDs at startup would detach v2 slots from annotations and exceptions.
+    if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='course_templates'").fetchone():
+        return
     raw=c.execute('SELECT data FROM timetable_template WHERE id=1').fetchone()[0]
     template=with_ids(json.loads(raw))
     c.execute('UPDATE timetable_template SET data=? WHERE id=1',(json.dumps(template,ensure_ascii=False),))

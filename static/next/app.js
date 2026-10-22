@@ -101,14 +101,20 @@ const createAccountButton=document.createElement('button');createAccountButton.t
 const oldAccountSubmit=accountForm.onsubmit;accountForm.onsubmit=async e=>{e.preventDefault();if(accountBusy)return;if(!accountForm.reportValidity())return;lastActionButton=accountForm.querySelector('.primary');if(accountForm.elements.action.value!=='reset'&&!await askConfirm('确认提交此账户修改？接下来需验证身份。'))return;return oldAccountSubmit(e)};
 // Courses: inspect your timetable, the public template, or adjustments at one depth.
 const courseTabs=document.createElement('div');courseTabs.className='detail-tabs';courseTabs.setAttribute('role','tablist');courseTabs.setAttribute('aria-label','课表内容');$('#course-preview').before(courseTabs);let courseTab='personal';
-function nextCoursePreview(){const rows=courseTab==='template'?JSON.parse(courseOriginal||'[]'):state.timetable||[];courseTabs.innerHTML=[['personal','我的课表'],['template','公共模板'],['changes','临时调整']].map(([id,label])=>`<button role="tab" aria-selected="${id===courseTab}" class="${id===courseTab?'active':''}" data-course-tab="${id}">${label}</button>`).join('');$('#course-preview').hidden=courseTab==='changes';$('#personal-course-changes').hidden=courseTab!=='changes';$('#course-admin').hidden=!state.user.admin||courseTab!=='template';$('#import-courses').hidden=courseTab!=='template';$('#course-preview').innerHTML=rows.length?`<div class="course-table">${rows.map(c=>`<div><span>周${['','一','二','三','四','五','六','日'][Number(c.day)]||c.day}</span><span>${esc(c.time)}</span><strong>${esc(c.name)}</strong><small>${esc(c.room||'')} · ${c.weeks==='odd'?'单周':c.weeks==='even'?'双周':'每周'} ${c.start||1}–${c.end||16} 周</small></div>`).join('')}</div>`:'<div class="empty-state">尚未导入个人课表。可以在公共模板页预览并导入。</div>';if(courseTab==='changes'&&!$('#personal-course-changes').textContent)$('#personal-course-changes').innerHTML='<div class="empty-state">暂时没有临时调整。</div>'}
+function nextCoursePreview(){
+ courseTabs.innerHTML=[['personal','我的课程'],['template','可用模板'],['changes','临时调整']].map(([id,label])=>`<button role="tab" aria-selected="${id===courseTab}" class="${id===courseTab?'active':''}" data-course-tab="${id}">${label}</button>`).join('');
+ $('#course-preview').hidden=courseTab==='changes';$('#personal-course-changes').hidden=courseTab!=='changes';$('#course-admin').hidden=true;$('#import-courses').hidden=true;
+ if(courseTab==='personal'){$('#course-preview').innerHTML=personalCoursesMarkup();$('#course-preview').querySelectorAll('[data-course-series]').forEach(button=>button.onclick=()=>showCourseSeries(button.dataset.courseSeries))}
+ if(courseTab==='template')$('#course-preview').innerHTML='<p>可用模板可分别预览、合并导入或更新，已有个人修改会在差异预览中保留。</p><p><a href="/timetables/">打开课表模板设计器</a></p>';
+ renderCourseChanges();if(courseTab==='changes'&&!$('#personal-course-changes').textContent)$('#personal-course-changes').innerHTML='<div class="empty-state">暂时没有临时调整与停课记录。</div>';
+}
 const oldTimetableOpen=$('#timetable-button').onclick;$('#timetable-button').onclick=async()=>{await oldTimetableOpen();if($('#timetable-dialog').open){$('#timetable-dialog h2').textContent='课程安排';courseTab='personal';nextCoursePreview()}};courseTabs.onclick=e=>{const b=e.target.closest('[data-course-tab]');if(b){courseTab=b.dataset.courseTab;nextCoursePreview()}};
-const oldImport=$('#import-courses').onclick;$('#import-courses').onclick=async()=>{lastActionButton=$('#import-courses');if(!state.timetable?.length&&!await askConfirm('导入公共课表到当前账户？'))return;return oldImport()};
+$('#import-courses').onclick=()=>{location.href='/timetables/'};
 const shareAction=$('#share-admin-form').elements.action,shareActionLabel=shareAction.closest('label');shareActionLabel.hidden=true;const shareAdminTabs=document.createElement('div');shareAdminTabs.className='detail-tabs';shareActionLabel.before(shareAdminTabs);const oldAdminVisibility=adminVisibility;adminVisibility=function(){oldAdminVisibility();shareAdminTabs.innerHTML=[['create','创建'],['rebind','绑定'],['active','登录状态']].map(([id,label])=>`<button type="button" aria-pressed="${shareAction.value===id}" class="${shareAction.value===id?'active':''}" data-share-action="${id}">${label}</button>`).join('')};shareAdminTabs.onclick=e=>{const b=e.target.closest('[data-share-action]');if(b&&!shareBusy){shareAction.value=b.dataset.shareAction;adminVisibility()}};
 window.addEventListener('beforeunload',e=>{if(authPending){e.preventDefault();e.returnValue=''}});
-const oldSaveTemplate=$('#save-courses').onclick;$('#save-courses').onclick=async()=>{lastActionButton=$('#save-courses');if(!await askConfirm('更新公共课程模板及节假日？'))return;await oldSaveTemplate();if($('#timetable-dialog').open)nextCoursePreview()};
+$('#save-courses').onclick=()=>{location.href='/timetables/'};
 // Course cards use the same two-line rhythm as tasks, retaining detail actions.
-courseBlocks=function(rows){return rows.map(c=>{const title=[c.name,c.date,c.time,c.room,c.adjusted?'原安排：'+c.original_date+' '+c.original_time:''].filter(Boolean).join(' · ');const body=`<strong><span class="course-name">${esc(c.name)}${c.cancelled?' · 已取消':c.adjusted?' · 已调课':''}</span>${c.homework_required?`<span class="course-homework-badge ${c.homework_done?'homework-done':''}" title="作业${c.homework_done?'已完成':'未完成'}" aria-label="作业${c.homework_done?'已完成':'未完成'}">HW</span>`:''}</strong><small>${esc(c.time)}${c.room?' · '+esc(c.room):''}</small>`;return `<div class="course-note compact-course ${c.cancelled?'course-cancelled':''}" title="${esc(title)}">${state.readonly?body:`<button class="course-open" data-course-key="${esc(c.course_key)}" data-course-date="${esc(c.original_date)}">${body}</button>`}</div>`}).join('')};
+courseBlocks=function(rows){return rows.filter(c=>!c.cancelled).map(c=>{const title=[c.name,c.date,c.time,c.room,c.adjusted?'原安排：'+c.original_date+' '+c.original_time:''].filter(Boolean).join(' · ');const body=`<strong><span class="course-name">${esc(c.name)}${c.kind==='makeup'?' · 补课':c.kind==='extra'?' · 加课':c.adjusted?' · 已调课':''}</span>${c.homework_required?`<span class="course-homework-badge ${c.homework_done?'homework-done':''}" title="作业${c.homework_done?'已完成':'未完成'}" aria-label="作业${c.homework_done?'已完成':'未完成'}">HW</span>`:''}</strong><small>${esc(c.time)}${c.room?' · '+esc(c.room):''}</small>`;return `<div class="course-note compact-course ${c.cancelled?'course-cancelled':''}" title="${esc(title)}">${state.readonly?body:`<button class="course-open" data-course-key="${esc(c.course_key)}" data-course-date="${esc(c.original_date)}">${body}</button>`}</div>`}).join('')};
 if(state)render();
 // Low-frequency utilities have one entry and a stable peer-tab window.
 const utilityDialog=document.createElement('dialog');utilityDialog.id='utility-dialog';utilityDialog.innerHTML='<div class="dialog-head"><h2>设置与导出</h2><button type="button" id="utility-close" aria-label="关闭设置">×</button></div><div class="detail-tabs" role="tablist" aria-label="设置与导出"><button role="tab" data-utility-tab="settings">设置</button><button role="tab" data-utility-tab="export">导出</button></div>';document.body.append(utilityDialog);const utilities=document.querySelector('.side-bottom');utilityDialog.append(utilities);const utilityGroups=[...utilities.querySelectorAll(':scope > details')];let utilityTab='settings';
@@ -134,8 +140,7 @@ const originalLoadShares=loadShares;loadShares=async function(){await originalLo
 $('#share-back').onclick=async()=>{if(shareBusy)return;lastActionButton=$('#share-back');if(policyDirty()&&!await askConfirm('返回账户列表并放弃未保存的分享修改？'))return;selectedShare=null;shareForm.hidden=true;shareOverviewMode()};$('#share-preview-current').onclick=()=>{if(selectedShare&&!shareBusy)$('#my-shares').querySelector(`[data-share-preview="${selectedShare.id}"]`)?.click()};shareForm.addEventListener('invalid',e=>{const panel=e.target.closest('[data-policy-panel]');if(panel)selectPolicyTab(panel.dataset.policyPanel)},true);
 // Reserve one scrollable course body; the tabs and footer stay outside it.
 const courseDialog=$('#timetable-dialog'),courseBody=document.createElement('div');courseBody.id='course-body';$('#course-preview').before(courseBody);for(const element of [$('#course-preview'),$('#personal-course-changes'),$('#course-admin')])courseBody.append(element);const courseFooter=document.createElement('div');courseFooter.className='course-footer';courseBody.after(courseFooter);courseFooter.append($('#import-courses'));courseFooter.append($('#course-error'));
-const baseCourseDetails=showCourseDetails;showCourseDetails=function(key,date){baseCourseDetails(key,date);const dialog=$('#course-details'),course=state.timetable?.find(c=>c.course_id===key),change=state.course_exceptions?.find(x=>x.course_key===key&&x.date===date);if(!dialog||!course)return;const adjust=dialog.querySelector('[data-change]');adjust.textContent='调整时间';adjust.hidden=!!change?.cancelled;if(!change?.cancelled){const cancel=document.createElement('button');cancel.type='button';cancel.className='soft-danger';cancel.textContent='取消本次课程';dialog.querySelector('.task-detail-actions').append(cancel);cancel.onclick=async()=>{if(courseSaving||confirmationPending)return;lastActionButton=cancel;if(!await askConfirm('取消「'+course.name+'」在 '+date+' 的这次课程？','确认取消'))return;courseSaving=true;try{await api('course-exceptions','PUT',{course_key:key,date,cancelled:true,new_date:'',new_time:''});await refresh();renderCourseChanges();dialog.close();toast('本次课程已取消')}catch(e){toast(e.message)}finally{courseSaving=false}}}};
-const baseCourseChange=openCourseChange;openCourseChange=function(key,date){baseCourseChange(key,date);const dialog=$('#course-change-dialog');if(!dialog)return;const checkbox=dialog.querySelector('[name=cancelled]');checkbox.closest('label').hidden=true;checkbox.checked=false;checkbox.onchange();dialog.querySelector('h2').textContent='调整课程时间';dialog.querySelector('.primary').textContent='保存时间';};
+
 const confirmedLogout=$('#logout-button').onclick;$('#logout-button').onclick=async()=>{lastActionButton=$('#logout-button');await confirmedLogout();if(!state)utilityDialog.close()};
 // Two quiet, bounded prompt panels after the summary statistics.
 const contextPanels=document.createElement('section');contextPanels.className='context-panels';contextPanels.setAttribute('aria-label','近期提示');document.querySelector('.stats').after(contextPanels);
@@ -187,6 +192,7 @@ function modalViewStamp(dialog){
     const task=[...state.tasks,...(state.deferred_tasks||[])].find(t=>t.id===dialog.dataset.taskId);
     return task?String(task.version):'missing';
   }
+  if(['course-series-dialog','timetable-dialog'].includes(dialog.id))return JSON.stringify({plan:state.course_plan,rows:state.course_dates});
   if(dialog.id==='course-details')return JSON.stringify(state.course_dates?.find(c=>c.course_key===dialog.dataset.courseKey&&c.original_date===dialog.dataset.courseDate)||null);
   return null;
 }
@@ -200,7 +206,7 @@ closeSharing=async function(){if(shareBusy)return;if(!shareEditor.hidden){await 
 let viewerDraftBaseline='',viewerAdminLoaded=false;function viewerDraftSnapshot(){return JSON.stringify(Object.fromEntries(new FormData($('#share-admin-form'))))}
 const managementTabBeforeGuard=managementTab;managementTab=function(tab){managementTabBeforeGuard(tab);};
 const closeAccounts=async()=>{if(shareBusy||accountBusy)return;if(viewerAdminLoaded&&viewerDraftSnapshot()!==viewerDraftBaseline){lastActionButton=$('#accounts-close');if(!await askConfirm('放弃未提交的展示账户管理操作？'))return;$('#share-admin-form').reset();viewerDraftBaseline=viewerDraftSnapshot()}$('#accounts-dialog').close()};$('#accounts-close').onclick=closeAccounts;$('#accounts-dialog').addEventListener('cancel',e=>{e.preventDefault();closeAccounts()});
-const coursePreviewBeforeAdmin=nextCoursePreview;nextCoursePreview=function(){coursePreviewBeforeAdmin();$('#course-admin').hidden=courseTab!=='admin'||!state.user.admin;if(state.user.admin){const button=document.createElement('button');button.type='button';button.setAttribute('role','tab');button.dataset.courseTab='admin';button.textContent='模板管理';button.classList.toggle('active',courseTab==='admin');button.setAttribute('aria-selected',String(courseTab==='admin'));courseTabs.append(button)}if(courseTab==='admin'){$('#course-preview').hidden=true;$('#personal-course-changes').hidden=true;$('#import-courses').hidden=true}};
+
 // Creation and editing of categories are peers, keeping reminder fields off the list.
 const categoryTabs=document.createElement('nav');categoryTabs.className='detail-tabs';categoryTabs.innerHTML='<button type="button" class="active" data-category-tab="existing">已有分类</button><button type="button" data-category-tab="new">新增分类</button>';$('#category-rows').before(categoryTabs);function selectCategoryTab(tab){$('#category-rows').hidden=tab!=='existing';$('#category-form').hidden=tab!=='new';$('.category-add-heading').hidden=tab!=='new';categoryTabs.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.categoryTab===tab))}categoryTabs.onclick=e=>{const b=e.target.closest('[data-category-tab]');if(b&&!categoryBusy)selectCategoryTab(b.dataset.categoryTab)};selectCategoryTab('existing');
 // Disclosure wrappers in the utility window no longer carry disclosure semantics.
@@ -210,6 +216,8 @@ selectUtility=function(tab){utilityTab=tab;utilityGroups.forEach((group,i)=>grou
 function dailyReminders(date,tasks){const end=Date.parse(date+'T23:59:59+08:00'),now=Math.min(Date.now(),end),rows=[];for(const task of tasks){if(task.done)continue;const points=[];if(task.due)points.push({label:'截止',at:task.due});for(const m of task.milestones||[])if(!m.done)points.push({label:m.label||'节点',at:m.stop_at});for(const point of points){const at=Date.parse(point.at.endsWith('+08:00')?point.at:point.at+'+08:00');if(at<=end)rows.push({task,...point,ms:at,late:at<now})}}rows.sort((a,b)=>a.ms-b.ms);if(!rows.length)return '';return `<section class="daily-reminders" aria-label="待办提醒"><h3>待办提醒 <span>${rows.length} 项未完成 · 逾期与当天到期</span></h3><div>${rows.map(row=>`<button class="${row.late?'overdue':''}" data-task="${esc(row.task.id)}"><span>${row.late?'!':'◆'}</span><strong>${esc(row.task.short_title||row.task.title)} · ${esc(row.label)}</strong><small>${esc(row.at.slice(5,16).replace('T',' '))}${row.late?' · 已逾期':''}</small></button>`).join('')}</div></section>`}
 const taskDetailsBeforeReturn=showTaskDetails;showTaskDetails=function(id){taskDetailsBeforeReturn(id);const dialog=$('#task-details');if(dialog)dialog.dataset.taskId=id};const courseDetailsBeforeReturn=showCourseDetails;showCourseDetails=function(key,date){courseDetailsBeforeReturn(key,date);const dialog=$('#course-details');if(dialog){dialog.dataset.courseKey=key;dialog.dataset.courseDate=date}};
 function refreshReturnedDetails(dialog){
+  if(dialog.id==='course-series-dialog'&&dialog.dataset.courseId)showCourseSeries(dialog.dataset.courseId);
+  if(dialog.id==='timetable-dialog')nextCoursePreview();
   if(dialog.id==='task-details'&&dialog.dataset.taskId){
     if(!state.tasks.some(t=>t.id===dialog.dataset.taskId)){dialog.close();return}
     const tab=dialog.querySelector('[data-detail-tab].active')?.dataset.detailTab;
@@ -273,7 +281,7 @@ showCourseDetails=function(key,date){
     e.preventDefault();if(courseSaving||confirmationPending)return;
     const data=JSON.parse(snapshot()),button=form.querySelector('[type=submit]'),error=form.querySelector('[data-error]');
     courseSaving=true;button.disabled=true;error.textContent='';
-    try{await api('course-annotations','PUT',{course_key:key,date,...data});original=JSON.stringify(data);renderOverview(data);selectTab('info');await refresh();toast('已保存课程备注与作业设置')}catch(err){error.textContent=err.message}finally{courseSaving=false;button.disabled=false}
+    try{await api('course-annotations','PUT',{...courseIdentity(course,key,date),...data});original=JSON.stringify(data);renderOverview(data);selectTab('info');await refresh();toast('已保存课程备注与作业设置')}catch(err){error.textContent=err.message}finally{courseSaving=false;button.disabled=false}
   };
 };
 
@@ -345,3 +353,16 @@ function limitDateYear(input){
 document.querySelectorAll('input').forEach(limitDateYear);
 document.addEventListener('focusin',event=>limitDateYear(event.target));
 new MutationObserver(records=>{for(const record of records){if(record.type==='attributes')limitDateYear(record.target);for(const node of record.addedNodes){if(node.nodeType!==1)continue;limitDateYear(node);node.querySelectorAll('input').forEach(limitDateYear)}}}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['type']});
+
+// The designer can return directly to the owner's cancellation and makeup list.
+let courseAdjustmentsPending=new URLSearchParams(location.search).get('courses')==='adjustments';
+const renderBeforeCourseLink=render;
+render=function(...args){
+  renderBeforeCourseLink(...args);
+  if(!courseAdjustmentsPending||!state||state.readonly)return;
+  courseAdjustmentsPending=false;
+  queueMicrotask(()=>Promise.resolve($('#timetable-button').onclick()).then(()=>{
+    if($('#timetable-dialog').open){courseTab='changes';nextCoursePreview()}
+  }).catch(error=>toast(error.message)));
+};
+if(state&&courseAdjustmentsPending)render();

@@ -48,9 +48,10 @@ def project_export(source, raw):
             if overlap or t['due'] or t['milestones']:tasks.append(t)
         if p['timetable']:
             for i,c in enumerate(source.get('course_dates',[])):
-                key=c.get('course_key','busy-'+str(i))+'@'+c.get('original_date',c['date'])
-                if c.get('cancelled') or not lo<=c['date']<=hi or (not busy and key in p['exclude_courses']):continue
-                item={k:c[k] for k in ('date','name','time','room','course_key','original_date','original_time','adjusted') if k in c}
+                legacy_key=c.get('course_key','busy-'+str(i))+'@'+c.get('original_date',c['date'])
+                key=c.get('occurrence_id') or legacy_key
+                if c.get('cancelled') or not lo<=c['date']<=hi or (not busy and (key in p['exclude_courses'] or legacy_key in p['exclude_courses'])):continue
+                item={k:c[k] for k in ('date','name','time','room','course_key','original_date','original_time','adjusted','occurrence_id','kind') if k in c}
                 item['export_key']=key
                 if not restricted and p['course_notes']:item['notes']=c.get('notes','')
                 if not restricted and p['homework']:

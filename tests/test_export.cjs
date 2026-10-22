@@ -20,9 +20,13 @@ const d={settings:{name:'演示学期'},range:{start:'2026-10-12',end:'2026-10-1
  }
  pages.length=0;await E.renderImages({...d,tasks:[]},'list');assert(pages[0].drawn.includes('所选范围内暂无内容'));
  const p=E.selection(d);assert.equal(p.format,'planner-selection-v1');assert(!('timetable' in p));
- const b=E.backup({...d,timetable:['whole'],course_exceptions:[],holidays:[]});assert.equal(b.format,1);assert.equal(b.tasks.length,1);
+ const b=E.backup({...d,timetable:['whole'],course_exceptions:[],holidays:[]});assert.equal(b.format,2);assert.equal(b.tasks.length,1);
  const deferred={id:'d',deferred:true,previous_schedule:{date:'2026-09-01',milestones:[{label:'原节点',done:true}]}};
  const complete=E.backup({...d,deferred_tasks:[deferred]});assert.equal(complete.tasks.length,2);assert.deepEqual(complete.tasks[1],deferred);assert.equal(d.tasks.length,1);
+ const courseArchive={courses:[{course_id:'math',slots:[{slot_id:'mon'}]}],sources:[{template_id:'default',version:1}]};
+ const privateRecord={course_key:'mon',date:'2026-10-12',notes:'保留备注',homework_required:true,homework_notes:'保留作业'};
+ const archive=E.backup({...d,course_plan:courseArchive,course_annotations:[privateRecord],course_makeups:[{id:'extra'}],course_occurrence_snapshots:[{id:'old'}]});
+ assert.deepEqual(archive.course_plan,courseArchive);assert.deepEqual(archive.course_annotations,[privateRecord]);assert.equal(archive.course_makeups[0].id,'extra');assert.equal(archive.course_occurrence_snapshots[0].id,'old');
  const entries=E.dayEntries(d,'2026-10-13');assert(entries.some(x=>x.lines.join('').includes('节点')));
  console.log('export geometry, pagination, point events and formats passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

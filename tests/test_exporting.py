@@ -44,6 +44,16 @@ class Projection(unittest.TestCase):
         for text in ['任务秘密','课程秘密','作业秘密','手记秘密']:self.assertIn(text,json.dumps(d,ensure_ascii=False))
         d=self.export(exclude_tasks=['t1'],exclude_courses=['c1@2026-09-15'],journal='all',exclude_journal=['2026-09-16'])
         self.assertEqual(d['tasks'],[]);self.assertEqual(d['course_dates'],[]);self.assertEqual(d['journal'],[])
+    def test_stable_makeup_identity_and_legacy_exclusions(self):
+        s=source();s['course_dates'][0].update(occurrence_id='extra:stable',kind='extra')
+        options=dict(range='custom',start='2026-09-16',end='2026-09-23')
+        row=project_export(s,options)['course_dates'][0]
+        self.assertEqual(row['export_key'],'extra:stable')
+        self.assertEqual(row['kind'],'extra')
+        for exclusion in ('extra:stable','c1@2026-09-15'):
+            self.assertEqual(project_export(s,{**options,'exclude_courses':[exclusion]})['course_dates'],[])
+        busy=project_export(s,{**options,'busy_only':True})
+        self.assertNotIn('extra:stable',json.dumps(busy))
     def test_busy_scrubs_selection_and_supports_exclusion(self):
         d=self.export(busy_only=True,notes=True,course_notes=True,homework=True,journal='all')
         for text in ['私人任务','简称','秘密','节点','c1','t1','课程名']:self.assertNotIn(text,json.dumps(d,ensure_ascii=False))

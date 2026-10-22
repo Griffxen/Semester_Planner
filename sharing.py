@@ -1,7 +1,7 @@
 """Read-only sharing: policy validation and server-side projection."""
 import datetime as dt
 import json
-from courses import expand
+from course_plans import private_projection
 
 DEFAULT_POLICY = dict(enabled=False, categories=[], range='week', start='', end='', done=False,
                       notes=False, busy_only=False, journal='none', journal_dates=[], timetable=False, export=False)
@@ -52,8 +52,9 @@ def private_state(c,uid):
         task['deferred']=bool(task['deferred'])
     result['deferred_tasks']=sorted((t for t in result['tasks'] if t['deferred']),key=lambda t:(t['deferred_at'],t['id']),reverse=True)
     result['tasks']=[t for t in result['tasks'] if not t['deferred']]
-    result['course_dates']=expand(result['timetable'],result['settings']['start'],result['holidays'],result['course_exceptions'],include_cancelled=True)
+    result.update(private_projection(c,uid,result['settings']['start']))
     annotations={(r['course_key'],r['date']):dict(r) for r in c.execute('SELECT course_key,date,notes,homework_required,homework_notes,homework_done FROM course_annotations WHERE user_id=?',(uid,))}
+    result['course_annotations']=list(annotations.values())
     for course in result['course_dates']:
         annotation=annotations.get((course['course_key'],course['original_date']),{})
         course.update(notes=annotation.get('notes',''),homework_required=bool(annotation.get('homework_required',False)),homework_notes=annotation.get('homework_notes',''),homework_done=bool(annotation.get('homework_done',False)))
@@ -109,7 +110,7 @@ def shared_state(c,viewer,today=None,export_keys=False):
     if p['journal']!='none':
         result['journal']=[dict(date=j['date'],body=j['body']) for j in own['journal'] if lo<=j['date']<=hi and (p['journal']=='all' or j['date'] in p['journal_dates'])]
     if p['timetable']:
-        result['course_dates']=[{k:course[k] for k in (('date','name','time','room','course_key','original_date') if export_keys else ('date','name','time','room'))}
+        result['course_dates']=[{k:course[k] for k in (('date','name','time','room','course_key','original_date','occurrence_id') if export_keys else ('date','name','time','room')) if k in course}
                                 for course in own['course_dates'] if not course['cancelled'] and lo<=course['date']<=hi]
     if busy: anonymize(result)
     return result

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>课程安排 · 学期手记</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg?v=2">
+  <script src="/next/theme.js"></script>
+  <link rel="stylesheet" href="/timetables/style.css">
+  <script src="/timetables/domain.js" defer></script>
+  <script src="/timetables/app.js" defer></script>
+</head>
+<body>
+  <header class="page-header">
+    <a class="brand" href="/next/"><img src="/icon.svg?v=2" alt="">学期手记<span>课程安排</span></a>
+    <div class="header-links"><a href="/next/">返回看板</a><button id="theme-toggle" type="button" aria-label="切换深浅色">深浅色</button></div>
+  </header>
+  <main>
+    <section id="loading" class="message" role="status">正在读取课程安排…</section>
+    <section id="login" class="message" hidden><h1>登录后管理课程</h1><p>课表模板与个人课程使用学期手记的同一账户。</p><a class="button primary" href="/next/">前往登录</a></section>
+    <div id="workspace" hidden>
+      <nav class="page-nav" aria-label="课程工作区"><button id="nav-personal" type="button">我的课程</button><button id="nav-templates" type="button">课表模板</button><a href="/next/?courses=adjustments">临时调整与补课 ↗</a></nav>
+      <section id="template-list" hidden>
+        <div class="section-heading"><div><p class="eyebrow">课表模板</p><h1>选择一份课表</h1><p class="muted">独立维护课程、作息、停课日期与权限，导入后保留个人副本。</p></div><button id="create-template" class="primary" type="button" hidden>＋ 新建模板</button></div>
+        <div id="template-cards" class="template-cards"></div>
+      </section>
+      <section id="designer" hidden>
+        <div class="section-heading designer-heading"><div><p class="eyebrow" id="plan-kind">我的课程</p><h1 id="plan-name"></h1><p id="plan-summary" class="muted"></p></div><div class="heading-actions"><span id="dirty-status" role="status"></span><button id="discard" type="button">放弃草稿</button><button id="save" class="primary" type="button">保存课表</button><button id="import-template" type="button" hidden>导入／更新我的课程</button></div></div>
+        <div id="version-warning" class="warning" hidden role="alert">保存时版本发生变化，草稿仍保留。请在新标签页核对最新课表，再返回此页处理修改。<a id="latest-link" href="/timetables/" target="_blank" rel="noopener">查看最新版本 ↗</a><button id="download-draft" type="button">下载当前草稿</button></div>
+        <div id="readonly-warning" class="notice" hidden>你可以查看及导入此模板；编辑需要该模板的协作权限。</div>
+        <nav class="tabs" aria-label="课表设置"><button data-tab="courses" class="active" type="button">课程安排</button><button data-tab="periods" type="button">作息时间</button><button data-tab="holidays" type="button">停课日期</button><button data-tab="sources" type="button" hidden>来源课表</button><button data-tab="permissions" type="button" hidden>权限</button></nav>
+        <div id="panel-courses" class="tab-panel">
+          <div class="designer-grid">
+            <aside class="course-list-panel panel"><div class="panel-heading"><h2>课程 <span id="course-count"></span></h2><button id="add-course" type="button">＋ 新课程</button></div><div id="course-list"></div><div class="course-tools"><button id="merge-courses" type="button">合并所选课程</button><p class="muted small">合并与拆分保留时段身份及已有记录。</p></div><div id="merge-candidates"></div></aside>
+            <section class="calendar-panel panel"><div class="panel-heading preview-heading"><h2>周课表预览</h2><label>第 <select id="preview-week" aria-label="预览教学周"></select> 周</label></div><p id="preview-caption" class="muted small"></p><div id="week-conflicts" class="warning" hidden></div><div id="mobile-days" class="mobile-days" aria-label="选择星期"></div><div id="week-grid" class="week-grid"></div><p class="muted small calendar-help">点击空白时段添加安排；点击课程块编辑。周次为教学周，时间为北京时间。</p></section>
+            <aside id="editor-panel" class="slot-panel panel"><div class="panel-heading"><h2 id="editor-heading">选择一门课程</h2><button id="close-editor" type="button" aria-label="关闭时段编辑">×</button></div><p id="editor-empty" class="muted">从课程列表选择课程，或点击课表空白处新增时段。</p><form id="slot-form" hidden>
+              <label>课程名称<input name="course_name" maxlength="120" required></label>
+              <label>星期<select name="day"><option value="1">星期一</option><option value="2">星期二</option><option value="3">星期三</option><option value="4">星期四</option><option value="5">星期五</option><option value="6">星期六</option><option value="7">星期日</option></select></label>
+              <div class="form-row"><label>开始周<input name="start" type="number" min="1" max="18" value="1" required></label><label>结束周<input name="end" type="number" min="1" max="18" value="18" required></label></div>
+              <label>上课周次<select name="weeks"><option value="all">每周</option><option value="odd">单周</option><option value="even">双周</option></select></label>
+              <label>时间输入方式<select name="time_mode"><option value="clock">具体时刻</option><option value="period">按节次</option></select></label>
+              <div id="clock-inputs" class="form-row"><label>开始时刻<input name="start_time" type="time" value="08:00" step="60"></label><label>结束时刻<input name="end_time" type="time" value="09:40" step="60"></label></div>
+              <div id="period-inputs" hidden><p id="period-basis" class="muted small"></p><div class="form-row"><label>开始节次<select name="period_start"></select></label><label>结束节次<select name="period_end"></select></label></div></div>
+              <label>上课地点<input name="room" maxlength="120" placeholder="可不填"></label>
+              <p id="slot-error" class="error" role="alert"></p><button class="primary" id="apply-slot">应用到草稿</button><div class="editor-actions"><button id="new-slot" type="button">＋ 同一门课另加时段</button><button id="split-slot" type="button">将此时段拆成新课程</button><button id="remove-slot" type="button" class="danger">删除此时段</button><button id="remove-course" type="button" class="danger">删除整门课程</button></div>
+              <p class="muted small">应用到草稿后，点击页面顶部“保存课表”提交。</p>
+            </form></aside>
+          </div>
+        </div>
+        <section id="panel-periods" class="tab-panel panel settings-panel" hidden><h2>作息时间</h2><p class="muted">按顺序设置节次。修改后会提示受影响课程，已引用的节次需先调整课程才能删除。</p><form id="period-form"><label id="period-calendar-label" hidden>所属课表<select id="period-calendar" name="calendar_id"></select></label><div id="period-rows"></div><button id="add-period" type="button">＋ 添加节次</button><button class="primary">应用作息到草稿</button><p id="period-error" class="error" role="alert"></p></form></section>
+        <section id="panel-holidays" class="tab-panel panel settings-panel" hidden><h2>停课日期</h2><p id="holiday-caption" class="muted">普通周课在这些日期停课，显式调课与补课经确认仍可安排。</p><form id="holiday-form"><label id="holiday-calendar-label" hidden>所属课表<select id="holiday-calendar" name="calendar_id"></select></label><div id="holiday-rows"></div><button id="add-holiday" type="button">＋ 添加停课日期</button><button class="primary">应用停课日期到草稿</button><p id="holiday-error" class="error" role="alert"></p></form></section>
+        <section id="panel-sources" class="tab-panel panel settings-panel" hidden><h2>来源课表</h2><p class="muted">个人副本独立保存。源模板更新需预览并确认；源模板撤权或归档后仍保留已有课程和记录。</p><div id="source-list"></div><button id="browse-sources" type="button">选择可用模板</button></section>
+        <section id="panel-permissions" class="tab-panel panel settings-panel" hidden><h2>此模板的权限</h2><p class="muted">全站管理员可以管理所有模板。协作者只能编辑此模板，不能修改授权或归档。</p><form id="permissions-form"><label class="check"><input type="checkbox" name="public">所有普通账户可查看并导入</label><div id="permission-rows"></div><button class="primary">保存权限</button><p id="permission-error" class="error" role="alert"></p></form></section>
+      </section>
+    </div>
+    <p id="page-error" class="error" role="alert"></p>
+  </main>
+  <dialog id="name-dialog"><form id="name-form"><div class="panel-heading"><h2 id="name-heading">新建模板</h2><button type="button" data-close-dialog aria-label="关闭">×</button></div><label id="name-caption">名称<input name="name" maxlength="120" required></label><p id="name-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" data-close-dialog>取消</button><button class="primary">确认</button></div></form></dialog>
+  <dialog id="merge-dialog"><form id="merge-form"><div class="panel-heading"><h2>合并课程</h2><button type="button" data-close-dialog aria-label="关闭">×</button></div><p id="merge-caption"></p><label>保留课程身份<select name="target"></select></label><label>合并后课程名称<input name="name" required maxlength="120"></label><p class="muted">所有时段身份保留，不复制课次、备注或作业。合并结果先进入草稿。</p><div class="dialog-actions"><button type="button" data-close-dialog>取消</button><button class="primary">确认合并</button></div></form></dialog>
+  <dialog id="import-dialog"><div class="panel-heading"><h2>导入变更预览</h2><button type="button" data-close-dialog aria-label="关闭">×</button></div><p id="import-caption"></p><div id="import-changes"></div><div id="import-conflicts"></div><div id="import-protected"></div><p id="import-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" data-close-dialog>取消</button><button id="confirm-import" class="primary" type="button">确认导入</button></div></dialog>
+  <dialog id="confirm-dialog"><div class="panel-heading"><h2 id="confirm-heading">请确认</h2></div><p id="confirm-message"></p><div class="dialog-actions"><button id="confirm-cancel" type="button">取消</button><button id="confirm-ok" class="primary" type="button">确认</button></div></dialog>
+  <div id="toast" role="status" hidden></div>
+</body>
+</html>
