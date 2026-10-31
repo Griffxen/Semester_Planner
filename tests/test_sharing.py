@@ -9,7 +9,7 @@ class Sharing(unittest.TestCase):
     def setUp(self):
         test_app.API.setUpClass.__func__(type(self));test_app.API.setUp(self)
         self.login()
-        self.assertEqual(self.req('shares','POST',dict(action='create',name='viewer',password='1234',owner_id=1,current_password='test-password-123'))[0],200)
+        self.assertEqual(self.req('shares','POST',dict(action='create',name='viewer',password='viewer-test-password-2026',owner_id=1,current_password='test-password-123'))[0],200)
         self.share=self.req('shares')[1]['shares'][0]
         self.vid=self.share['id']
     def tearDown(self):test_app.API.tearDownClass.__func__(type(self))
@@ -18,7 +18,7 @@ class Sharing(unittest.TestCase):
         p={**DEFAULT_POLICY,'enabled':True,'categories':['课程'],'range':'custom','start':'2026-09-15','end':'2026-09-20',**kwargs}
         self.assertEqual(self.req('shares','PUT',dict(id=self.vid,version=current['version'],policy=p))[0],200)
     def viewer(self):
-        self.req('logout','POST',{});self.login('viewer','1234')
+        self.req('logout','POST',{});self.login('viewer','viewer-test-password-2026')
     def dashboard(self,path,token='',method='GET'):
         request=urllib.request.Request(self.url+'/api/v1/'+path,method=method,
             headers={'Authorization':'Bearer '+token} if token else {})
@@ -115,9 +115,9 @@ class Sharing(unittest.TestCase):
         for endpoint,method in [('tasks','POST'),('tasks/other','DELETE'),('settings','PUT'),('journal','PUT'),('profile','PUT'),('categories','POST'),('timetable','GET'),('timetable','PUT'),('users','POST'),('shares','GET'),('shares','PUT'),('share-preview/'+str(self.vid),'GET')]:
             self.assertEqual(self.req(endpoint,method,{} if method!='GET' else None)[0],403,(endpoint,method))
         self.assertEqual(self.req('view-export')[0],403)
-        self.assertEqual(self.req('password','POST',dict(current_password='1234',password='5678'))[0],200)
+        self.assertEqual(self.req('password','POST',dict(current_password='viewer-test-password-2026',password='viewer-reset-password-2026'))[0],200)
         self.assertEqual(self.req('state')[0],401)
-        self.login('viewer','5678')
+        self.login('viewer','viewer-reset-password-2026')
     def test_projection_preview_and_export(self):
         for title,cat,done in [('allowed','课程',False),('hidden category','科研',False),('completed','课程',True)]:
             self.assertEqual(self.req('tasks','POST',dict(title=title,category=cat,date='2026-09-10',end_date='2026-09-25',due='2026-09-26T10:00',notes='PRIVATE',done=done))[0],200)
@@ -149,7 +149,7 @@ class Sharing(unittest.TestCase):
     def test_disable_and_conflict(self):
         self.policy();self.assertEqual(self.req('shares','PUT',dict(id=self.vid,version=1,policy=DEFAULT_POLICY))[0],409)
         self.assertEqual(self.req('shares','POST',dict(action='active',id=self.vid,active=False,current_password='test-password-123'))[0],200)
-        self.req('logout','POST',{});self.assertEqual(self.req('login','POST',dict(name='viewer',password='1234'))[0],403)
+        self.req('logout','POST',{});self.assertEqual(self.req('login','POST',dict(name='viewer',password='viewer-test-password-2026'))[0],403)
     def test_rebind_revokes_session(self):
         self.viewer();viewer_client=self.client;viewer_csrf=self.csrf
         test_app.API.setUp(self);self.login()
@@ -202,8 +202,8 @@ class Sharing(unittest.TestCase):
         self.assertEqual(t['title'],'已占用');self.assertTrue(t['continues_before'] and t['continues_after'])
     def test_viewer_can_rename_own_account(self):
         self.policy();self.viewer()
-        self.assertEqual(self.req('username','POST',dict(name='alice',current_password='1234'))[0],409)
-        self.assertEqual(self.req('username','POST',dict(name='new-viewer',current_password='1234',id=1))[0],200)
+        self.assertEqual(self.req('username','POST',dict(name='alice',current_password='viewer-test-password-2026'))[0],409)
+        self.assertEqual(self.req('username','POST',dict(name='new-viewer',current_password='viewer-test-password-2026',id=1))[0],200)
         self.assertEqual(self.req('state')[1]['user']['name'],'new-viewer')
         with app.connect() as c:
             self.assertEqual(c.execute('SELECT owner_id FROM viewers WHERE user_id=?',(self.vid,)).fetchone()[0],1)
@@ -215,8 +215,8 @@ class Sharing(unittest.TestCase):
         self.assertEqual(viewer['role'],'viewer');self.assertEqual(viewer['owner_name'],'alice')
         for x in result['accounts']:
             self.assertNotIn('password',x);self.assertNotIn('salt',x);self.assertNotIn('policy',x)
-        self.assertEqual(self.req('users','POST',dict(action='reset',name='viewer',current_password='test-password-123',password='5678'))[0],200)
-        self.req('logout','POST',{});self.login('viewer','5678')
+        self.assertEqual(self.req('users','POST',dict(action='reset',name='viewer',current_password='test-password-123',password='viewer-reset-password-2026'))[0],200)
+        self.req('logout','POST',{});self.login('viewer','viewer-reset-password-2026')
         self.assertEqual(self.req('users')[0],403)
         self.req('logout','POST',{});self.login('bob','other-password-123')
         self.assertEqual(self.req('users')[0],403)

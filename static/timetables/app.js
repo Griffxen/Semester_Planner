@@ -90,6 +90,7 @@
       ...(data === undefined ? {} : { body: JSON.stringify(data) })
     });
     let result; try { result = await response.json(); } catch (_) { result = {}; }
+    if(result.setup_required||result.auth?.setup_required||result.code==='auth_setup_required'){window.PlannerManagement?.invalidate();session=null;$('#workspace').hidden=true;root.querySelectorAll('input[type=password]').forEach(input=>{input.value='';});location.replace('/setup/?return='+(window.Mobile?'mobile':'desktop'));throw Object.assign(Error('请完成首次设置：/setup/'),{status:403,code:'auth_setup_required'});}
     if (destroyed) throw new DOMException('设计器已关闭', 'AbortError');
     if (!response.ok) {
       if (response.status === 401) { $('#workspace').hidden = true; $('#login').hidden = false; }

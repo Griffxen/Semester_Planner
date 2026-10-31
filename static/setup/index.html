@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#315d4b">
+  <title>首次设置 · 学期手记</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg?v=2">
+  <script src="/next/theme.js"></script>
+  <link rel="stylesheet" href="/next/paint.css">
+  <link rel="stylesheet" href="/setup/setup.css">
+  <script defer src="/setup/setup.js"></script>
+</head>
+<body>
+  <main class="setup-card">
+    <a class="setup-brand" href="/">学期手记</a>
+    <h1>设置登录凭据</h1>
+    <p id="setup-account" class="setup-muted" role="status">正在读取账户…</p>
+    <form id="setup-form" hidden>
+      <label>新密码 <small>至少12位</small><input name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password"></label>
+      <label>确认密码<input name="confirm_password" type="password" required minlength="12" maxlength="256" autocomplete="new-password"></label>
+      <div class="setup-pin-grid">
+        <label>4–6位PIN<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,6}" minlength="4" maxlength="6" required autocomplete="off"></label>
+        <label>确认PIN<input name="confirm_pin" type="password" inputmode="numeric" pattern="[0-9]{4,6}" minlength="4" maxlength="6" required autocomplete="off"></label>
+      </div>
+      <label class="setup-check"><input name="trust_device" type="checkbox">信任此设备（30天）</label>
+      <label id="setup-device" hidden>设备名称<input name="label" maxlength="80" autocomplete="off" placeholder="此设备"></label>
+      <button id="setup-submit" class="primary" type="submit">保存并继续</button>
+    </form>
+    <div id="setup-choice" class="setup-choice" hidden>
+      <button id="setup-planning" class="primary" type="button">进入规划</button>
+      <button id="setup-management" type="button">进入管理</button>
+    </div>
+    <button id="setup-signout" type="button" hidden>退出登录</button>
+    <p id="setup-error" class="setup-error" role="alert"></p>
+    <a id="setup-login" hidden>重新登录</a>
+  </main>
+</body>
+</html>

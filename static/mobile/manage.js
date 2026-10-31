@@ -140,7 +140,7 @@
     const rename = action === 'rename';
     const self = action === 'self';
     const title = rename ? '修改用户名' : self ? '修改密码' : action === 'create' ? '创建普通账户' : `重置 ${account?.name || ''} 的密码`;
-    const minimum = self ? (M.data.user.admin ? 12 : 4) : account?.admin ? 12 : 4;
+    const minimum = 12;
     formPage({title, label: rename ? '修改用户名' : self ? '修改密码' : action === 'create' ? '创建账户' : '重置密码', body:
       (!self ? field(rename ? '新用户名' : '用户名', input('name', account?.name || '', `required maxlength="64" autocomplete="off"${account ? ' readonly' : ''}`), '1–64 位，不能含空白或控制字符。') : '') +
       field(self || rename ? '你的当前密码' : '管理员自己的密码', input('current_password', '', 'type="password" required maxlength="1024" autocomplete="current-password"')) +
@@ -165,8 +165,9 @@
     return loadPage('账户管理', async page => {
       const rows = (await M.api('/api/users')).accounts;
       const roles = {admin: '管理员', user: '普通账户', viewer: '展示账户'};
-      bodyOf(page).innerHTML = `<p class="m-muted">共 ${rows.length} 个账户。重置密码会退出目标账户的全部会话。</p>${button('创建普通账户', 'data-create-user', 'm-primary')}<div class="m-stack">${rows.map(u => `<section class="m-card"><strong>${esc(u.remark || u.name)}</strong><p class="m-muted">@${esc(u.name)} · ${roles[u.role] || '普通账户'}${u.role === 'viewer' ? ` · 所有者 ${esc(u.owner_name || '')} · ${u.active ? u.sharing_enabled ? '分享中' : '未开启' : '已停用'}` : ''}</p>${button('重置密码', `data-reset-user="${u.id}"`)}</section>`).join('')}</div>${button('展示账户的创建与绑定', 'data-viewer-admin')}<p class="m-error" data-error role="alert"></p>`;
+      bodyOf(page).innerHTML = `<p class="m-muted">共 ${rows.length} 个账户。重置密码会退出目标账户的全部会话。</p>${button('创建普通账户', 'data-create-user', 'm-primary')}<div class="m-stack">${rows.map(u => `<section class="m-card"><strong>${esc(u.remark || u.name)}</strong><p class="m-muted">@${esc(u.name)} · ${u.root_admin?'根管理员':roles[u.role] || '普通账户'}${u.role === 'viewer' ? ` · 所有者 ${esc(u.owner_name || '')} · ${u.active ? u.sharing_enabled ? '分享中' : '未开启' : '已停用'}` : ''}</p>${u.root_admin?((String(u.id)===String(M.data.user.id)||u.name===M.data.user.name)?button('登录与安全','data-root-security'):''):button('重置密码', `data-reset-user="${u.id}"`)}</section>`).join('')}</div>${button('展示账户的创建与绑定', 'data-viewer-admin')}<p class="m-error" data-error role="alert"></p>`;
       $(page, '[data-create-user]').onclick = () => editCredentials('create');
+      page.querySelectorAll('[data-root-security]').forEach(b=>b.onclick=()=>M.openSecurity());
       page.querySelectorAll('[data-reset-user]').forEach(b => b.onclick = () => editCredentials('reset', rows.find(u => String(u.id) === b.dataset.resetUser)));
       $(page, '[data-viewer-admin]').onclick = async () => { try { openShareAdmin(await M.api('/api/shares')); } catch (error) { M.error(page, error); } };
     });
@@ -262,7 +263,7 @@
     const owners = data.owners || [], accounts = data.accounts || [];
     formPage({title: '展示账户管理', label: '执行操作', body:
       field('操作', `<select class="m-input" name="action">${option('create','创建展示账户','create')}${option('rebind','重新绑定所有者','create')}${option('active','启用／停用账户','create')}</select>`) +
-      `<section data-create>${field('用户名', input('name', '', 'maxlength="64" autocomplete="off"'))}${field('账户初始密码', input('password', '', 'type="password" minlength="4" maxlength="256" autocomplete="new-password"'))}${field('再次输入初始密码', input('confirm', '', 'type="password" maxlength="256" autocomplete="new-password"'))}</section>` +
+      `<section data-create>${field('用户名', input('name', '', 'maxlength="64" autocomplete="off"'))}${field('账户初始密码', input('password', '', 'type="password" minlength="12" maxlength="256" autocomplete="new-password"'))}${field('再次输入初始密码', input('confirm', '', 'type="password" maxlength="256" autocomplete="new-password"'))}</section>` +
       `<section data-target>${field('展示账户', `<select class="m-input" name="id">${accounts.map(a => option(String(a.id), `${a.name} → ${owners.find(o => o.id === a.owner_id)?.name || ''}${a.active ? '' : '（停用）'}`, '')).join('')}</select>`)}</section>` +
       `<section data-owner>${field('日程所有者', `<select class="m-input" name="owner_id">${owners.map(o => option(String(o.id),o.name,'')).join('')}</select>`)}</section>` +
       `<section data-active>${check('active','启用此展示账户',true)}</section>` +

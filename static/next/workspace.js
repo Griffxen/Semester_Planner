@@ -12,6 +12,7 @@
   const homeEntry = document.createElement('button'); homeEntry.id = 'workspace-home'; homeEntry.type = 'button'; homeEntry.dataset.icon = 'grid'; homeEntry.textContent = '首页';
   const designEntry = document.createElement('button'); designEntry.id = 'workspace-courses'; designEntry.type = 'button'; designEntry.dataset.icon = 'calendar'; designEntry.textContent = '课表设计';
   $('#sharing-button').before(homeEntry, designEntry);
+  const extensions = new Map();
   const records = {home:{top:0, category:'', query:'', folds:new Map()}, courses:{top:0}, deferred:{top:0, category:'', query:''}};
   let displayed = 'home', controller = null, mounting = null, generation = 0, navigation = 0, designerOpened = false, owner = '', previewReturn = null, restoring = false;
   const principal = () => String(state?.user?.id ?? state?.user?.name ?? '');
@@ -21,7 +22,7 @@
     if (page === 'home') records.home.folds = new Map([...$('#calendar').querySelectorAll('details[id]')].map(node => [node.id, node.open]));
   }
   function restoreFilters(page) {
-    if (page === 'courses') return;
+    if (page !== 'home' && page !== 'deferred') return;
     filter = records[page].category || ''; $('#search').value = records[page].query || '';
   }
   function restoreFolds() {
@@ -43,6 +44,8 @@
   function panels() {
     home.hidden = workspacePage !== 'home'; design.hidden = workspacePage !== 'courses'; deferred.hidden = workspacePage !== 'deferred';
     designEntry.hidden = !!state?.readonly;
+    for (const [page, entry] of extensions) {entry.section.hidden = workspacePage !== page;entry.button.hidden = !state || !!state.readonly || (entry.admin && !state.user.admin);entry.button.classList.toggle('selected',workspacePage === page);if(workspacePage === page)entry.button.setAttribute('aria-current','page');else entry.button.removeAttribute('aria-current');}
+    if (extensions.has(workspacePage)) $('#category-section').hidden = true;
     if (workspacePage === 'courses') $('#category-section').hidden = true;
     for (const [page, button] of [['home',homeEntry],['courses',designEntry],['deferred',$('#deferred-button')]]) {
       const active = workspacePage === page; button.classList.toggle('selected', active);
@@ -88,7 +91,8 @@
   }
   async function show(page, options = {}) {
     if (!state) return false;
-    if (!['home','courses','deferred'].includes(page) || state.readonly) page = 'home';
+    if ((!['home','courses','deferred'].includes(page) && !extensions.has(page)) || state.readonly) page = 'home';
+    if (extensions.get(page)?.beforeShow && !await extensions.get(page).beforeShow()) return false;
     if (busy || courseSaving || shareBusy || confirmationPending || controller?.isBusy()) {toast('正在保存，请稍候');return false;}
     const ticket = ++navigation;
     const changed = workspacePage !== page;
@@ -97,6 +101,7 @@
     restoring = true; render(); restoring = false; displayed = page;
     if (options.history !== false) updateUrl(page,options.design,options.replace);
     if (changed) requestAnimationFrame(() => window.scrollTo(0,records[page].top));
+    if (extensions.has(page)) {try {await extensions.get(page).onShow?.();}catch(error){toast(error.message);}}
     if (page === 'courses') {
       try {
         const instance = await designer();
@@ -106,7 +111,7 @@
     }
     return true;
   }
-  window.PlannerWorkspace = {show};
+  window.PlannerWorkspace = {show, register(page, entry) {extensions.set(page,entry);records[page]={top:0};entry.section.hidden=true;main.append(entry.section);$('#sharing-button').before(entry.button);entry.button.onclick=()=>show(page);panels();}, refreshAuth() {resetDesigner();if(workspacePage==='courses')designer();}};
   homeEntry.onclick = () => show('home'); designEntry.onclick = () => show('courses');
   $('#deferred-button').onclick = () => show('deferred');
   $('#import-courses').onclick = $('#save-courses').onclick = () => {DesktopModal.reset();show('courses',{design:{personal:false}});};

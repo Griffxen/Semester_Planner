@@ -1,5 +1,6 @@
 import unittest,tempfile,threading,json,urllib.request,urllib.error,http.cookiejar,sys
 from pathlib import Path
+from contextlib import closing
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import app
 class API(unittest.TestCase):
@@ -9,15 +10,18 @@ class API(unittest.TestCase):
  @classmethod
  def tearDownClass(cls): cls.server.shutdown();cls.server.server_close();cls.temp.cleanup()
  def setUp(self):
-  with app.connect() as c: c.execute('DELETE FROM attempts')
+  with closing(app.connect()) as c, c: c.execute('DELETE FROM attempts');c.execute('DELETE FROM auth_attempts')
   self.client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()));self.csrf=''
  def req(self,path,method='GET',data=None):
   r=urllib.request.Request(self.url+'/api/'+path,data=json.dumps(data).encode() if data is not None else None,method=method,headers={'Content-Type':'application/json','X-CSRF-Token':self.csrf})
   try: res=self.client.open(r)
   except urllib.error.HTTPError as e: res=e
-  return res.status,json.load(res)
+  with res: return res.status,json.load(res)
  def login(self,name='alice',password='test-password-123'):
-  self.assertEqual(self.req('login','POST',{'name':name,'password':password})[0],200);self.csrf=self.req('state')[1]['csrf']
+  status,result=self.req('login','POST',{'name':name,'password':password});self.assertEqual(status,200);self.csrf=result['csrf']
+  if result.get('setup_required'):
+   status,result=self.req('auth/setup','POST',{'password':password,'pin':'005555'});self.assertEqual(status,200);self.csrf=result['csrf']
+  self.csrf=self.req('state')[1]['csrf']
  def test_auth_csrf_logout(self):
   self.assertEqual(self.req('state')[0],401);self.assertEqual(self.req('login','POST',{'name':'alice','password':'wrong'})[0],401);self.login();token=self.csrf;self.csrf='bad';self.assertEqual(self.req('settings','PUT',{})[0],403);self.csrf=token;self.assertEqual(self.req('logout','POST',{})[0],200);self.assertEqual(self.req('state')[0],401)
  def test_crud_conflict_isolation(self):
@@ -52,17 +56,17 @@ class API(unittest.TestCase):
   final=next(t for t in self.req('state')[1]['tasks'] if t['id']==task['id'])
   self.assertEqual(final['milestones'],[]);self.assertEqual(final['short_title'],'')
  def test_account_management(self):
-  self.login();d={'action':'create','name':'charlie','current_password':'test-password-123','password':'1234'}
+  self.login();d={'action':'create','name':'charlie','current_password':'test-password-123','password':'charlie-test-password-2026'}
   self.assertEqual(self.req('users','POST',d)[0],200)
   self.assertEqual(self.req('users','POST',d)[0],409)
-  self.req('logout','POST',{});self.login('charlie','1234')
+  self.req('logout','POST',{});self.login('charlie','charlie-test-password-2026')
   self.assertEqual(self.req('users','POST',d)[0],403)
-  self.assertEqual(self.req('password','POST',{'current_password':'wrong','password':'5678'})[0],400)
-  self.assertEqual(self.req('password','POST',{'current_password':'1234','password':'5678'})[0],200)
+  self.assertEqual(self.req('password','POST',{'current_password':'wrong','password':'charlie-changed-password-2026'})[0],403)
+  self.assertEqual(self.req('password','POST',{'current_password':'charlie-test-password-2026','password':'charlie-changed-password-2026'})[0],200)
   self.assertEqual(self.req('state')[0],401)
-  self.login('charlie','5678');self.req('logout','POST',{});self.login()
-  self.assertEqual(self.req('users','POST',{**d,'action':'reset','password':'9012'})[0],200)
-  self.req('logout','POST',{});self.login('charlie','9012')
+  self.login('charlie','charlie-changed-password-2026');self.req('logout','POST',{});self.login()
+  self.assertEqual(self.req('users','POST',{**d,'action':'reset','password':'charlie-reset-password-2026'})[0],200)
+  self.req('logout','POST',{});self.login('charlie','charlie-reset-password-2026')
  def test_password_lengths(self):
   self.login()
   self.assertEqual(self.req('password','POST',{'current_password':'test-password-123','password':'1234'})[0],400)
@@ -87,7 +91,7 @@ class API(unittest.TestCase):
  def test_rename_username(self):
   self.login();before=self.req('state')[1]
   d=dict(name='renamed-alice',current_password='test-password-123')
-  self.assertEqual(self.req('username','POST',{**d,'current_password':'wrong'})[0],400)
+  self.assertEqual(self.req('username','POST',{**d,'current_password':'wrong'})[0],403)
   for name in ['', 'white space', ' leading', 'x'*65, 'bad\x00name', None]:
    self.assertEqual(self.req('username','POST',{**d,'name':name})[0],400)
   self.assertEqual(self.req('username','POST',{**d,'name':'bob'})[0],409)
